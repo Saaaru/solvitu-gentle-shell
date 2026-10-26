@@ -1,6 +1,6 @@
 {
 	"$schema": "https://pi.dev/schemas/theme.schema.json",
-	"name": "Claude-Dark",
+	"name": "Solvitu-Dark",
 	"vars": {
 		"bg": "#1F1E1D",
 		"bgPanel": "#1F1E1D",
