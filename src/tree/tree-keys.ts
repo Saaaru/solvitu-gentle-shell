@@ -8,7 +8,7 @@ import { getFolderState, type FolderState } from "./folder-state.ts";
  * FLDR tab keyboard shortcuts. Pi reserves Alt+Up/Down (app.models.reorderUp/Down,
  * app.message.dequeue) and Alt+Left/Right (app.tree.foldOrUp/unfoldOrDown, editor word
  * movement), and gentle-pi owns Alt+A/G/K/T/U/S/E, so the tree uses free Alt keys:
- *   Alt+C / Alt+X        cursor up / down
+ *   Alt+C / Alt+X        cursor up / down (Alt+Up / Alt+Down are aliases, see below)
  *   Alt+. / Alt+,        expand directory or open file / collapse or go to parent
  *   Alt+PageUp/PageDown  scroll the file viewer
  * Every shortcut is inert unless the FLDR tab is the active sidebar tab.
@@ -26,6 +26,9 @@ export function registerTreeKeys(pi: Pick<ExtensionAPI, "registerShortcut">): vo
 
 	add("alt+c", "Folder tree: cursor up", (s) => s.tree?.moveCursor(-1));
 	add("alt+x", "Folder tree: cursor down", (s) => s.tree?.moveCursor(1));
+	// Alt+Up/Down are aliases: app.message.dequeue uses alt+q on Windows, so alt+up is free in the editor there.
+	add("alt+up", "Folder tree: cursor up", (s) => s.tree?.moveCursor(-1));
+	add("alt+down", "Folder tree: cursor down", (s) => s.tree?.moveCursor(1));
 	add("alt+.", "Folder tree: expand directory or open file", (s) => s.tree?.expandOrOpen());
 	add("alt+,", "Folder tree: collapse directory or go to parent", (s) => s.tree?.collapseOrUp());
 	add("alt+pageup", "Folder viewer: scroll up", (s) => s.viewer?.pageBy(-1));

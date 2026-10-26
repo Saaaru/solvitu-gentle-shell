@@ -227,7 +227,7 @@ test("folder keys - act only on the FLDR tab and re-render", () => {
 	try {
 		const shortcuts = new Map<string, () => void>();
 		registerTreeKeys({ registerShortcut: (id: string, opts: any) => shortcuts.set(id, opts.handler) } as any);
-		assert.deepEqual([...shortcuts.keys()].sort(), ["alt+,", "alt+.", "alt+pagedown", "alt+pageup", "alt+c", "alt+x"].sort());
+		assert.deepEqual([...shortcuts.keys()].sort(), ["alt+,", "alt+.", "alt+pagedown", "alt+pageup", "alt+c", "alt+x", "alt+up", "alt+down"].sort());
 
 		let renders = 0;
 		const tui: any = { terminal: { columns: 160, rows: 50 }, requestRender: () => renders++ };
@@ -249,6 +249,18 @@ test("folder keys - act only on the FLDR tab and re-render", () => {
 		shortcuts.get("alt+.")!();
 		assert.ok(card.getExpandedDirs().has("a"));
 		assert.ok(renders >= 3, "each action requests a render");
+
+		// Alt+Down / Alt+Up are aliases of Alt+X / Alt+C and also inert outside the FLDR tab.
+		shortcuts.get("alt+x")!();
+		const firstChild = folder.cursorPath;
+		assert.notEqual(firstChild, "a");
+		shortcuts.get("alt+up")!();
+		assert.equal(folder.cursorPath, "a", "Alt+Up moves the cursor up like Alt+C");
+		shortcuts.get("alt+down")!();
+		assert.equal(folder.cursorPath, firstChild, "Alt+Down moves the cursor down like Alt+X");
+		sidebarState(tui).activeTabId = "git";
+		shortcuts.get("alt+up")!();
+		assert.equal(folder.cursorPath, firstChild, "Alt+Up is inert on other tabs");
 	} finally {
 		footerRegistry.latestTodoTui = undefined;
 		fs.rmSync(dir, { recursive: true, force: true });

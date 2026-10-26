@@ -6,6 +6,7 @@ import { footerRegistry } from "./src/footer/footer-registry.ts";
 import { moveSelection, openSelected } from "./src/main-view.ts";
 import { registerTreeKeys } from "./src/tree/tree-keys.ts";
 import { registerSpotifyCommands } from "./src/spotify/spotify-commands.ts";
+import { registerSidebarArrowKeys } from "./src/sidebar-arrow-keys.ts";
 import { syncProjectCloud, detectProjectName } from "./src/solvi-engram.ts";
 import { SolviContextMonitor } from "./src/solvi-context-monitor.ts";
 import { installWelcomeBanner } from "./src/welcome.ts";
@@ -79,6 +80,7 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	// FLDR tab: Alt+C/X cursor, Alt+. / Alt+, expand/collapse, Alt+PageUp/PageDown scroll the viewer
 	registerTreeKeys(pi);
 	registerSpotifyCommands(pi);
+	registerSidebarArrowKeys(pi);
 
 	// Shows the bee until the first message, then hands the header slot to installWorkspaceHeader.
 	installWelcomeBanner(pi);
