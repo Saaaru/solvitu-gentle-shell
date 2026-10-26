@@ -1,0 +1,41 @@
+{
+	"_note": "Solvitu texts. Missing keys fall back to defaults in src/strings/.",
+	"brandTitle": "Solvitu",
+	"brandShort": "Solvitu",
+	"brandFallback": "Solvitu",
+	"hudTitle": "Solvitu",
+	"footerBrand": "Solvitu",
+	"footerShort": "Solvitu",
+	"footerSymbol": "",
+	"sidebarBanner": {
+		"full": "Solvitu · Gentle-Shell ",
+		"short": "Solvitu ",
+		"glyph": "",
+		"brand": "Solvitu",
+		"partner": "Gentle-Shell"
+	},
+	"todos": {
+		"glyph": "",
+		"textFmt": "Todos · {done} of {total}",
+		"moreFmt": "+{remaining} más"
+	},
+	"statusTitle": "Status",
+	"contextTitle": "Context",
+	"profileFormat": "{icon} {name}",
+	"editorHint": "type, or / for commands",
+	"welcomeTitles": {
+		"persona": "el Gentleman",
+		"dashboard": "Gentleman Welcome Dashboard",
+		"themeFallback": "Solvitu",
+		"commandDescription": "Configure or toggle the Gentleman Welcome Dashboard (/welcome, /welcome full, /welcome compact, /welcome off)"
+	},
+	"welcomeHotkeys": {
+		"interrupt": "interrupt",
+		"commands": "commands",
+		"commandsShort": "cmd",
+		"bash": "bash",
+		"expandDashboard": "expand dashboard",
+		"expand": "expand",
+		"collapse": "collapse"
+	}
+}

@@ -3,30 +3,30 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
-	loadCuteLayout,
+	loadSolviLayout,
 	mergeLayout,
 	mergeSidebar,
-	resetCuteLayoutCache,
-} from "../src/cute-layout.ts";
+	resetSolviLayoutCache,
+} from "../src/solvi-layout.ts";
 import {
-	renderCuteSidebarTabBar,
+	renderSolviSidebarTabBar,
 	resolveSidebarTab,
-	CUTE_SIDEBAR_TABS,
+	SOLVI_SIDEBAR_TABS,
 	installSidebar,
 	sidebarState,
 	sidebarPart,
-	CUTE_LAYOUT_WRAPPER,
+	SOLVI_LAYOUT_WRAPPER,
 	SIDEBAR_TAB_CARD_MAP,
 } from "../src/sidebar.ts";
-import { renderCUTESidebarBanner } from "../src/sidebar-state.ts";
-import { getGitSyncBadge } from "../src/cute-git-graph.ts";
+import { renderSolviSidebarBanner } from "../src/sidebar-state.ts";
+import { getGitSyncBadge } from "../src/solvi-git-graph.ts";
 import { measureDockMetrics, findDock, findTranscript } from "../src/sidebar-dock.ts";
 import { createSidebarMouseHandler } from "../src/sidebar-mouse.ts";
 import { resetAll } from "./test-helpers.ts";
 
-test("sidebar tabs - loadCuteLayout contains tabs defaults and mergeLayout respects overrides", () => {
+test("sidebar tabs - loadSolviLayout contains tabs defaults and mergeLayout respects overrides", () => {
 	resetAll();
-	const layout = loadCuteLayout();
+	const layout = loadSolviLayout();
 	assert.equal(layout.sidebar.tabsEnabled, true);
 	assert.equal(layout.sidebar.defaultTab, "1");
 
@@ -63,20 +63,20 @@ test("sidebar tabs - loadCuteLayout contains tabs defaults and mergeLayout respe
 	assert.equal(preserved.defaultTab, "1");
 });
 
-test("sidebar tabs - renderCuteSidebarTabBar generates expected tabs, non-empty hitboxes, and respects width", () => {
+test("sidebar tabs - renderSolviSidebarTabBar generates expected tabs, non-empty hitboxes, and respects width", () => {
 	// 1. Unthemed generation check for tab contents
-	const unthemedBar = renderCuteSidebarTabBar(50, "1");
+	const unthemedBar = renderSolviSidebarTabBar(50, "1");
 	assert.ok(unthemedBar.line.length > 0);
 	assert.ok(unthemedBar.divider.length > 0);
 	assert.equal(visibleWidth(unthemedBar.line), 50);
 	assert.equal(visibleWidth(unthemedBar.divider), 50);
 
-	// Generates bar with expected tabs: 1:MAIN, 2:GIT, 3:PROF, 4:MEM, 5:TREE
+	// Generates bar with expected tabs: 1:MAIN, 2:GIT, 3:PROF, 4:MEM, 5:SKILLS, 6:YT
 	assert.ok(unthemedBar.line.includes("1:MAIN"));
 	assert.ok(unthemedBar.line.includes("2:GIT"));
 	assert.ok(unthemedBar.line.includes("3:PROF"));
 	assert.ok(unthemedBar.line.includes("4:MEM"));
-	assert.ok(unthemedBar.line.includes("5:TREE"));
+	assert.ok(unthemedBar.line.includes("5:SKILLS"));
 
 	// Non-empty hitboxes for canonical tabs
 	assert.ok(unthemedBar.hitboxes.length >= 5);
@@ -92,13 +92,13 @@ test("sidebar tabs - renderCuteSidebarTabBar generates expected tabs, non-empty 
 	const mockTheme = {
 		fg: (role: string, text: string) => `\x1b[38;5;200m${text}\x1b[0m`,
 	} as any;
-	const themedBar = renderCuteSidebarTabBar(50, "1", mockTheme);
+	const themedBar = renderSolviSidebarTabBar(50, "1", mockTheme);
 	assert.equal(visibleWidth(themedBar.line), 50);
 	assert.equal(visibleWidth(themedBar.divider), 50);
 	assert.ok(themedBar.hitboxes.length >= 5);
 
 	// 3. Narrow rail edge case: visibleWidth must never exceed width
-	const narrowBar = renderCuteSidebarTabBar(20, "2", mockTheme);
+	const narrowBar = renderSolviSidebarTabBar(20, "2", mockTheme);
 	assert.ok(visibleWidth(narrowBar.line) <= 20, `Narrow line visible width ${visibleWidth(narrowBar.line)} must be <= 20`);
 	assert.ok(visibleWidth(narrowBar.divider) <= 20);
 	for (const h of narrowBar.hitboxes) {
@@ -107,25 +107,25 @@ test("sidebar tabs - renderCuteSidebarTabBar generates expected tabs, non-empty 
 	}
 
 	// 4. Very narrow rail (width = 5)
-	const tinyBar = renderCuteSidebarTabBar(5, "1");
+	const tinyBar = renderSolviSidebarTabBar(5, "1");
 	assert.ok(visibleWidth(tinyBar.line) <= 5);
 
 	// 5. Zero width
-	const zeroBar = renderCuteSidebarTabBar(0, "1");
+	const zeroBar = renderSolviSidebarTabBar(0, "1");
 	assert.equal(visibleWidth(zeroBar.line), 0);
 	assert.equal(zeroBar.hitboxes.length, 0);
 });
 
 test("sidebar tabs - resolveSidebarTab resolves by id and by key", () => {
-	// Resolves by key ("1" -> "main", "2" -> "git", "3" -> "prof", etc.)
-	assert.equal(resolveSidebarTab("1").id, "main");
+	// Resolves by key ("1" -> "tree", "2" -> "git", "3" -> "prof", etc.)
+	assert.equal(resolveSidebarTab("1").id, "tree");
 	assert.equal(resolveSidebarTab("2").id, "git");
 	assert.equal(resolveSidebarTab("3").id, "prof");
-	assert.equal(resolveSidebarTab("4").id, "mem");
-	assert.equal(resolveSidebarTab("5").id, "tree");
+	assert.equal(resolveSidebarTab("3").id, "prof");
+	assert.equal(resolveSidebarTab("5").id, "skills");
 
 	// Resolves by id and backward-compatible aliases
-	assert.equal(resolveSidebarTab("main").id, "main");
+	assert.equal(resolveSidebarTab("git").id, "git");
 	assert.equal(resolveSidebarTab("git").id, "git");
 	assert.equal(resolveSidebarTab("prof").id, "prof");
 	assert.equal(resolveSidebarTab("agents").id, "prof", "legacy agents tab should map to prof");
@@ -133,26 +133,45 @@ test("sidebar tabs - resolveSidebarTab resolves by id and by key", () => {
 	assert.equal(resolveSidebarTab("forge").id, "prof", "forge should be backward compatible alias for prof");
 	assert.equal(resolveSidebarTab("mem").id, "mem");
 	assert.equal(resolveSidebarTab("tree").id, "tree");
-	assert.equal(resolveSidebarTab("0").id, "main", "legacy 0/all tab should safely fall back to main");
+	assert.equal(resolveSidebarTab("0").id, "tree", "legacy 0/all tab should safely fall back to the default (first) tab");
 
 	// SIDEBAR_TAB_CARD_MAP checks - clean canonical 5 tabs
-	assert.ok(SIDEBAR_TAB_CARD_MAP.prof.includes("cute-profiles"), "SIDEBAR_TAB_CARD_MAP.prof must include cute-profiles");
+	assert.ok(SIDEBAR_TAB_CARD_MAP.prof.includes("solvi-profiles"), "SIDEBAR_TAB_CARD_MAP.prof must include solvi-profiles");
 	assert.equal(SIDEBAR_TAB_CARD_MAP.agents, undefined, "legacy agents should be pruned from map");
 	assert.equal(SIDEBAR_TAB_CARD_MAP.forge, undefined, "legacy forge should be pruned from map");
 	assert.equal(SIDEBAR_TAB_CARD_MAP.usage, undefined, "legacy usage should be pruned from map");
 
-	// Fallback to main on undefined or invalid
-	assert.equal(resolveSidebarTab(undefined).id, "main");
-	assert.equal(resolveSidebarTab("").id, "main");
-	assert.equal(resolveSidebarTab("invalid").id, "main");
+	// Fallback to the default (first) tab on undefined or invalid
+	assert.equal(resolveSidebarTab(undefined).id, "tree");
+	assert.equal(resolveSidebarTab("").id, "tree");
+	assert.equal(resolveSidebarTab("invalid").id, "tree");
 
-	// Tab properties (canonical tabs: main, git, prof, mem, tree, yt)
-	assert.ok(CUTE_SIDEBAR_TABS.length >= 5, "CUTE_SIDEBAR_TABS must contain at least 5 canonical tabs");
-	for (const tab of CUTE_SIDEBAR_TABS) {
+	// Tab properties (canonical tabs: tree, git, prof, mem, skills, yt)
+	assert.ok(SOLVI_SIDEBAR_TABS.length >= 5, "SOLVI_SIDEBAR_TABS must contain at least 5 canonical tabs");
+	for (const tab of SOLVI_SIDEBAR_TABS) {
 		assert.ok(tab.id);
 		assert.ok(tab.key);
 		assert.ok(tab.label);
 		assert.ok(Array.isArray(tab.cards) && tab.cards.length > 0);
+	}
+});
+
+test("sidebar tabs - id/key/label lookup tokens never collide across tabs", () => {
+	// resolveSidebarTab matches by id OR key OR label (case-insensitive). If one tab's
+	// label equals another tab's id/key (e.g. a "MAIN" label colliding with an id:"main"
+	// tab), the earlier tab in the array silently shadows the later one for every lookup
+	// by that token — this regressed once (tree's label became "MAIN" while skills kept
+	// id "main"), breaking tab clicks and keyboard cycling into that tab.
+	const seen = new Map<string, string>();
+	for (const tab of SOLVI_SIDEBAR_TABS) {
+		for (const token of [tab.id, tab.key, tab.label.toLowerCase()]) {
+			const owner = seen.get(token);
+			assert.ok(
+				!owner || owner === tab.id,
+				`lookup token "${token}" is ambiguous between tabs "${owner}" and "${tab.id}"`,
+			);
+			seen.set(token, tab.id);
+		}
 	}
 });
 
@@ -192,12 +211,15 @@ test("sidebar tabs - mock TUI tab switching via click and wheel cycling", () => 
 		assert.ok(scrollEntry, "ScrollView component must be mounted");
 		const scroll = scrollEntry.component;
 
-		// Initial tab should resolve to defaultTab ("1" -> "main")
-		assert.equal(state.activeTabId, "main");
+		// Initial tab should resolve to defaultTab ("1" -> "tree")
+		assert.equal(state.activeTabId, "tree");
 
-		const layout = loadCuteLayout().sidebar;
+		const layout = loadSolviLayout().sidebar;
 		const netWidth = layout.railWidth - 2 * layout.railPadding;
-		const { hitboxes } = renderCuteSidebarTabBar(netWidth, "main");
+		// Compute hitboxes against the tab that is actually active right now (bracket
+		// padding on the active tab shifts every later tab's startX), so the click
+		// below lands where the live render will actually put the git tab.
+		const { hitboxes } = renderSolviSidebarTabBar(netWidth, state.activeTabId);
 		const gitHitbox = hitboxes.find((h) => h.id === "git");
 		assert.ok(gitHitbox, "Git hitbox must exist");
 
@@ -234,31 +256,31 @@ test("sidebar tabs - mock TUI tab switching via click and wheel cycling", () => 
 		});
 		assert.equal(state.activeTabId, "git", "Wheel delta -1 should cycle tab back to git");
 
-		// Wheel backward again -> from git (index 1) to main (index 0)
+		// Wheel backward again -> from git (index 1) to tree (index 0, the first tab)
 		scroll.handleMouse({
 			type: "wheel",
 			wheelDelta: -1,
 			x: 10,
 			y: 3,
 		});
-		assert.equal(state.activeTabId, "main", "Wheel delta -1 should cycle to main");
+		assert.equal(state.activeTabId, "tree", "Wheel delta -1 should cycle back to the first tab (tree)");
 
-		// Wheel backward from main (index 0) wraps to last tab
-		const lastTab = CUTE_SIDEBAR_TABS[CUTE_SIDEBAR_TABS.length - 1];
+		// Wheel backward from tree (first tab) wraps around to the last tab (yt)
+		const lastTab = SOLVI_SIDEBAR_TABS[SOLVI_SIDEBAR_TABS.length - 1];
 		scroll.handleMouse({
 			type: "wheel",
 			wheelDelta: -1,
 			x: 10,
 			y: 3,
 		});
-		assert.equal(state.activeTabId, lastTab.id, `Wheel delta -1 from index 0 should wrap to ${lastTab.id}`);
+		assert.equal(state.activeTabId, lastTab.id, `Wheel delta -1 from the first tab should wrap to ${lastTab.id}`);
 	} finally {
 		cleanup();
 		resetAll();
 	}
 });
 
-test("sidebar integration - gentle-shell wrapper cooperative coexistence (header preserved, foreign rail replaced, CUTE_LAYOUT_WRAPPER marked, idempotent)", () => {
+test("sidebar integration - gentle-shell wrapper cooperative coexistence (header preserved, foreign rail replaced, SOLVI_LAYOUT_WRAPPER marked, idempotent)", () => {
 	resetAll();
 	const NODE = Symbol.for("@earendil-works/pi-tui/layout-node");
 
@@ -315,36 +337,36 @@ test("sidebar integration - gentle-shell wrapper cooperative coexistence (header
 
 	const cleanup = installSidebar(mockTui);
 	try {
-		// 1. CUTE_LAYOUT_WRAPPER marker must be present on root[NODE]
+		// 1. SOLVI_LAYOUT_WRAPPER marker must be present on root[NODE]
 		assert.equal(typeof mockLayoutRoot[NODE], "function");
-		assert.equal((mockLayoutRoot[NODE] as any)[CUTE_LAYOUT_WRAPPER], true);
+		assert.equal((mockLayoutRoot[NODE] as any)[SOLVI_LAYOUT_WRAPPER], true);
 
 		// 2. Unpack layout node
 		const nodeResult = mockLayoutRoot[NODE]();
 		assert.equal(nodeResult.type, "vstack", "Top-level layout should be vstack preserving header");
-		assert.equal(nodeResult.entries.length, 2, "vstack must have 2 entries: header and cute container");
+		assert.equal(nodeResult.entries.length, 2, "vstack must have 2 entries: header and solvi container");
 
 		// Header entry is preserved at top
 		assert.equal(nodeResult.entries[0].component, foreignHeader, "Header entry component must be preserved");
 
-		// Body entry wraps cuteHstack
-		const cuteContainer = nodeResult.entries[1].component;
-		assert.ok(cuteContainer, "Cute container component must exist");
-		assert.equal(typeof cuteContainer[NODE], "function", "Cute container must have [NODE]");
+		// Body entry wraps solviHstack
+		const solviContainer = nodeResult.entries[1].component;
+		assert.ok(solviContainer, "Solvi container component must exist");
+		assert.equal(typeof solviContainer[NODE], "function", "Solvi container must have [NODE]");
 
-		const cuteHstack = cuteContainer[NODE]();
-		assert.equal(cuteHstack.type, "hstack", "Cute container node must be hstack");
+		const solviHstack = solviContainer[NODE]();
+		assert.equal(solviHstack.type, "hstack", "Solvi container node must be hstack");
 
 		// foreignRail should be discarded, foreignLeft should be preserved
-		const hasForeignRail = cuteHstack.entries.some((e: any) => e.component === foreignRail);
+		const hasForeignRail = solviHstack.entries.some((e: any) => e.component === foreignRail);
 		assert.equal(hasForeignRail, false, "Monolithic gentle-shell rail must be discarded");
 
-		const hasForeignLeft = cuteHstack.entries.some((e: any) => e.component === foreignLeft);
+		const hasForeignLeft = solviHstack.entries.some((e: any) => e.component === foreignLeft);
 		assert.equal(hasForeignLeft, true, "Prepared left component (transcript/dock) must be preserved");
 
-		// CUTE tabbed rail (ScrollView with handleMouse) must be mounted
-		const scrollEntry = cuteHstack.entries.find((e: any) => e.component && typeof e.component.handleMouse === "function");
-		assert.ok(scrollEntry, "CUTE tabbed ScrollView must be mounted in place of foreign rail");
+		// SOLVI tabbed rail (ScrollView with handleMouse) must be mounted
+		const scrollEntry = solviHstack.entries.find((e: any) => e.component && typeof e.component.handleMouse === "function");
+		assert.ok(scrollEntry, "SOLVI tabbed ScrollView must be mounted in place of foreign rail");
 
 		// 3. Idempotency: re-attaching does not double-wrap or overwrite
 		const currentWrapper = mockLayoutRoot[NODE];
@@ -392,7 +414,7 @@ test("sidebar integration - direct hstack without header discards foreign rail a
 
 	const cleanup = installSidebar(mockTui);
 	try {
-		assert.equal((mockLayoutRoot[NODE] as any)[CUTE_LAYOUT_WRAPPER], true);
+		assert.equal((mockLayoutRoot[NODE] as any)[SOLVI_LAYOUT_WRAPPER], true);
 
 		const nodeResult = mockLayoutRoot[NODE]();
 		assert.equal(nodeResult.type, "hstack", "Layout should be hstack without header");
@@ -404,7 +426,7 @@ test("sidebar integration - direct hstack without header discards foreign rail a
 		assert.equal(hasForeignLeft, true, "Foreign left must be used as main left");
 
 		const scrollEntry = nodeResult.entries.find((e: any) => e.component && typeof e.component.handleMouse === "function");
-		assert.ok(scrollEntry, "CUTE tabbed ScrollView must be mounted");
+		assert.ok(scrollEntry, "SOLVI tabbed ScrollView must be mounted");
 	} finally {
 		cleanup();
 		resetAll();
@@ -457,27 +479,27 @@ test("sidebar card height - activeTranscript viewportHeight aligns card height t
 		const nodeResult = mockLayoutRoot[NODE]();
 		assert.ok(nodeResult.entries.length >= 2, "HStack must contain entries");
 
-		const treeCard = state.parts.get("projectTree") as CinlodevProjectTreeCard;
+		const treeCard = state.parts.get("projectTree") as WorkspaceProjectTreeCard;
 		assert.ok(treeCard, "projectTree card should be registered in state.parts");
 
 		// Header lines: banner (2) + tab bar (2) + spacing before cards (1) = 5 lines
 		// Available card height = 48 (transcript viewportHeight) - 5 (headerLines) = 43 lines
-		const layout = loadCuteLayout().sidebar;
+		const layout = loadSolviLayout().sidebar;
 		const netWidth = layout.railWidth - layout.railPadding * 2;
 		const treeLines = treeCard.render(netWidth, 43);
 
 		assert.equal(treeLines.length, 43, "Tree card must render 43 lines (48 - headerLines)");
-		assert.ok(treeLines[42].includes("╚") || treeLines[42].includes("═") || treeLines[42].includes("─"), "Bottom line must be card bottom border");
+		assert.ok(treeLines[42].includes("└") || treeLines[42].includes("─") || treeLines[42].includes("─"), "Bottom line must be card bottom border");
 
-		// 2. Test "prof" tab (single card: cute-profiles)
+		// 2. Test "prof" tab (single card: solvi-profiles)
 		state.activeTabId = "prof";
 		mockLayoutRoot[NODE]();
-		const profCard = state.parts.get("cute-profiles") as CinlodevProfilesExtendedCard;
-		assert.ok(profCard, "cute-profiles card should be registered in state.parts");
+		const profCard = state.parts.get("solvi-profiles") as WorkspaceProfilesExtendedCard;
+		assert.ok(profCard, "solvi-profiles card should be registered in state.parts");
 
 		const profLines = profCard.render(netWidth, 43);
 		assert.equal(profLines.length, 43, "Profiles card must render 43 lines (48 - headerLines)");
-		assert.ok(profLines[42].includes("╚") || profLines[42].includes("═") || profLines[42].includes("─"), "Bottom line must be card bottom border");
+		assert.ok(profLines[42].includes("└") || profLines[42].includes("─") || profLines[42].includes("─"), "Bottom line must be card bottom border");
 	} finally {
 		cleanup();
 		resetAll();
@@ -522,7 +544,7 @@ test("sidebar tabs - switching to git tab renders 2 cards at 50/50 split without
 		const scrollEntry = nodeResult.entries.find((e: any) => e.component && typeof e.component.handleMouse === "function");
 		assert.ok(scrollEntry, "ScrollView rail entry must be mounted");
 
-		const layout = loadCuteLayout().sidebar;
+		const layout = loadSolviLayout().sidebar;
 		const railLines = scrollEntry.component.render(layout.railWidth);
 		assert.ok(railLines.length > 10, "Git tab rail must render lines");
 
@@ -577,8 +599,8 @@ test("sidebar-dock - measureDockMetrics, findDock and findTranscript execute saf
 	assert.equal(findTranscript(treeWithTranscript), mockScrollView as any);
 });
 
-test("sidebar-state - sidebarState, sidebarPart and renderCUTESidebarBanner operate safely", async () => {
-	const { sidebarState, sidebarPart, renderCUTESidebarBanner, SIDEBAR_STATE_KEY } = await import("../src/sidebar-state.ts");
+test("sidebar-state - sidebarState, sidebarPart and renderSolviSidebarBanner operate safely", async () => {
+	const { sidebarState, sidebarPart, renderSolviSidebarBanner, SIDEBAR_STATE_KEY } = await import("../src/sidebar-state.ts");
 
 	const mockTerminal: any = {};
 	const mockTui: any = { terminal: mockTerminal };
@@ -602,19 +624,18 @@ test("sidebar-state - sidebarState, sidebarPart and renderCUTESidebarBanner oper
 	assert.deepEqual(part.render(50), [], "Cuando el sidebar es active y ownsHost, debe suprimir el bottom retornando []");
 
 	// Banner
-	const banner = renderCUTESidebarBanner(50);
+	const banner = renderSolviSidebarBanner(50);
 	assert.ok(banner.length > 0, "Debe retornar al menos 1 línea de banner");
-	assert.ok(banner[0].includes("✿"), "Debe contener el glifo decorativo del banner");
-	assert.ok(banner[0].toUpperCase().includes("CINLODEV"), "Debe contener la marca o usuario en el banner");
+	assert.ok(banner[0].toUpperCase().includes("SOLVITU"), "Debe contener la marca Solvitu en el banner");
 });
 
 
 test("sidebar-tabs - gitSyncBadge renders cleanly in TabBar", () => {
 	// Git Sync badge en TabBar
-	const barWithBadge = renderCuteSidebarTabBar(60, "1", undefined, "▲2");
+	const barWithBadge = renderSolviSidebarTabBar(60, "1", undefined, "▲2");
 	assert.ok(barWithBadge.line.includes("2:GIT ▲2"), "Debe incluir el badge ▲2 en la pestaña GIT");
 
-	const activeGitWithBadge = renderCuteSidebarTabBar(60, "2", undefined, "▲1▼1");
+	const activeGitWithBadge = renderSolviSidebarTabBar(60, "2", undefined, "▲1▼1");
 	assert.ok(activeGitWithBadge.line.includes("2:GIT ▲1▼1"), "Debe incluir el badge de sync activo en la pestaña GIT");
 });
 
@@ -637,16 +658,16 @@ test("installSidebar - terminal.write seals unpainted scrollbar cell in rows wit
 	const uninstall = installSidebar(mockTui);
 
 	const sampleBrokenBuffer =
-		"\x1b[4;1H\x1b[2K║   \x1b_Ga=T,f=100,r=3;AAA\x1b\\  Song Title       ║ \x1b[0m\x1b]8;;\x07 \x1b[5;1H";
+		"\x1b[4;1H\x1b[2K│   \x1b_Ga=T,f=100,r=3;AAA\x1b\\  Song Title       │ \x1b[0m\x1b]8;;\x07 \x1b[5;1H";
 	mockTerminal.write(sampleBrokenBuffer);
 
-	assert.ok(!outputWritten.includes("║ \x1b[0m\x1b]8;;\x07 \x1b[5;1H"), "No debe dejar el espacio en blanco sin sellar");
-	assert.ok(outputWritten.includes("║ \x1b[0m\x1b]8;;\x07║\x1b[5;1H") || outputWritten.includes("║ \x1b[0m\x1b]8;;\x07│\x1b[5;1H"), "Debe inyectar el glifo de riel en la columna del scrollbar");
+	assert.ok(!outputWritten.includes("│ \x1b[0m\x1b]8;;\x07 \x1b[5;1H"), "No debe dejar el espacio en blanco sin sellar");
+	assert.ok(outputWritten.includes("│ \x1b[0m\x1b]8;;\x07│\x1b[5;1H") || outputWritten.includes("│ \x1b[0m\x1b]8;;\x07│\x1b[5;1H"), "Debe inyectar el glifo de riel en la columna del scrollbar");
 
 	uninstall();
 	outputWritten = "";
 	mockTerminal.write(sampleBrokenBuffer);
-	assert.ok(outputWritten.includes("║ \x1b[0m\x1b]8;;\x07 \x1b[5;1H"), "Tras desinstalar debe restaurar el write original");
+	assert.ok(outputWritten.includes("│ \x1b[0m\x1b]8;;\x07 \x1b[5;1H"), "Tras desinstalar debe restaurar el write original");
 });
 
 test("installSidebar - terminal.write seals scrollbar cell precisely without shifting into afterPad margin", () => {
@@ -668,14 +689,14 @@ test("installSidebar - terminal.write seals scrollbar cell precisely without shi
 
 	// Buffer con 4 espacios adicionales de margen (afterPad) a la derecha
 	const sampleBufferWithMargin =
-		"\x1b[4;1H\x1b[2K║   \x1b_Ga=T,f=100,r=3;AAA\x1b\\  Hurtless       ║ \x1b[0m\x1b]8;;\x07     \x1b[5;1H";
+		"\x1b[4;1H\x1b[2K│   \x1b_Ga=T,f=100,r=3;AAA\x1b\\  Hurtless       │ \x1b[0m\x1b]8;;\x07     \x1b[5;1H";
 	mockTerminal.write(sampleBufferWithMargin);
 
 	// El glifo debe colocarse inmediatamente tras reset, conservando los 4 espacios de margen restantes
 	assert.ok(
-		outputWritten.includes("║ \x1b[0m\x1b]8;;\x07║    \x1b[5;1H") ||
-		outputWritten.includes("║ \x1b[0m\x1b]8;;\x07│    \x1b[5;1H") ||
-		(outputWritten.includes("║ \x1b[0m\x1b]8;;\x07") && outputWritten.includes("    \x1b[5;1H")),
+		outputWritten.includes("│ \x1b[0m\x1b]8;;\x07│    \x1b[5;1H") ||
+		outputWritten.includes("│ \x1b[0m\x1b]8;;\x07│    \x1b[5;1H") ||
+		(outputWritten.includes("│ \x1b[0m\x1b]8;;\x07") && outputWritten.includes("    \x1b[5;1H")),
 		"Debe sellar en la columna exacta de scrollbar y conservar los espacios de margen a la derecha sin desfasar",
 	);
 
@@ -697,12 +718,12 @@ test("sidebar mouse tab switching emits deleteAllKittyImages to clear lingering 
 		scrollBy: () => {},
 	};
 	const mockState: any = {
-		activeTabId: "yt",
+		activeTabId: "solvi",
 		parts: new Map(),
 	};
 
 	const tabHitboxes = [
-		{ id: "main", startX: 1, endX: 10 },
+		{ id: "git", startX: 1, endX: 10 },
 		{ id: "prof", startX: 11, endX: 20 },
 	];
 

@@ -1,14 +1,14 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { cuteGlyphs, cutePalette, frameFg, type CutePalette } from "./cute-theme.ts";
-import { loadCuteLayout } from "./cute-layout.ts";
-import { loadCuteStrings } from "./cute-strings.ts";
+import { solviGlyphs, solviPalette, frameFg, type SolviPalette } from "./solvi-theme.ts";
+import { loadSolviLayout } from "./solvi-layout.ts";
+import { loadSolviStrings } from "./solvi-strings.ts";
 
-// Cinlodev CUTE colors come from themes/CinlodevCute.json via cutePalette().
+// Workspace colors come from themes/Workspace.json via solviPalette().
 // No hardcoded ANSI here: footer.ts shares the same single source of truth.
-// Row limits and card width come from config/CinlodevCute.layout.json via loadCuteLayout().
-const identityPalette: CutePalette = {
+// Row limits and card width come from config/Workspace.layout.json via loadSolviLayout().
+const identityPalette: SolviPalette = {
 	border: (s) => s,
 	pinkBright: (s) => s,
 	pinkAccent: (s) => s,
@@ -82,7 +82,7 @@ export function readTodoTasks(ctx: ExtensionContext): TodoTask[] | undefined {
 	}
 }
 
-function glyphFor(c: CutePalette, status: TodoTask["status"]): string {
+function glyphFor(c: SolviPalette, status: TodoTask["status"]): string {
 	if (status === "done") return c.mint("✓");
 	if (status === "in_progress") return c.gold("◉");
 	return c.dim("○");
@@ -109,7 +109,7 @@ function wrapWords(text: string, maxWidth: number): string[] {
 }
 
 /** Read-only mirror of the host harness todo checklist for the sidebar rail. */
-export class CinlodevTodoMirror implements Component {
+export class WorkspaceTodoMirror implements Component {
 	private readonly ctx: ExtensionContext;
 	private readonly tui: TUI;
 	private readonly theme?: Theme;
@@ -123,8 +123,8 @@ export class CinlodevTodoMirror implements Component {
 		this.theme = theme;
 	}
 
-	private palette(): CutePalette {
-		return this.theme ? cutePalette(this.theme) : identityPalette;
+	private palette(): SolviPalette {
+		return this.theme ? solviPalette(this.theme) : identityPalette;
 	}
 
 	private current(): TodoTask[] {
@@ -171,10 +171,10 @@ export class CinlodevTodoMirror implements Component {
 		const tasks = this.current();
 		this.touch(tasks);
 		if (tasks.length === 0) return [];
-		const safeWidth = Math.max(loadCuteLayout().todos.minWidth, width);
+		const safeWidth = Math.max(loadSolviLayout().todos.minWidth, width);
 		const innerWidth = safeWidth - 4;
 		const c = this.palette();
-		const g = cuteGlyphs(this.theme);
+		const g = solviGlyphs(this.theme);
 		const frame = (s: string): string =>
 			this.theme ? frameFg(this.theme, s) : s;
 
@@ -187,7 +187,7 @@ export class CinlodevTodoMirror implements Component {
 		};
 
 		const done = tasks.filter((task) => task.status === "done").length;
-		const strings = loadCuteStrings().todos;
+		const strings = loadSolviStrings().todos;
 		const titleText = strings.textFmt
 			.replace("{done}", String(done))
 			.replace("{total}", String(tasks.length));
@@ -266,8 +266,8 @@ export class CinlodevTodoMirror implements Component {
 		try {
 			const rows =
 				typeof availableHeight === "number" && availableHeight >= 5
-					? Math.max(availableHeight - 2, loadCuteLayout().todos.railMaxRows)
-					: loadCuteLayout().todos.railMaxRows;
+					? Math.max(availableHeight - 2, loadSolviLayout().todos.railMaxRows)
+					: loadSolviLayout().todos.railMaxRows;
 			return this.renderCard(width, rows);
 		} catch {
 			return [];
@@ -276,7 +276,7 @@ export class CinlodevTodoMirror implements Component {
 
 	renderBottom(width: number): string[] {
 		try {
-			return this.renderCard(width, loadCuteLayout().todos.bottomMaxRows);
+			return this.renderCard(width, loadSolviLayout().todos.bottomMaxRows);
 		} catch {
 			return [];
 		}

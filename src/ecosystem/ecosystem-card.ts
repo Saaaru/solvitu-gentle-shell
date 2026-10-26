@@ -1,8 +1,8 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { cuteGlyphs, cutePalette, safeFg } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
+import { solviGlyphs, solviPalette, safeFg } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
 import {
 	type EcosystemToolInfo,
 	getCachedEcosystem,
@@ -11,13 +11,13 @@ import {
 } from "./ecosystem-client.ts";
 
 /**
- * Formats a single tool item with cute palette colors.
+ * Formats a single tool item with solvi palette colors.
  */
 export function formatEcosystemPill(
 	tool: EcosystemToolInfo,
 	theme?: Theme
 ): string {
-	const c = cutePalette(theme!);
+	const c = solviPalette(theme!);
 	let nameColored: string;
 	switch (tool.accent) {
 		case "cyan":
@@ -49,13 +49,13 @@ export function formatEcosystemPill(
 }
 
 /**
- * CinlodevEcosystemCard:
- * - Ambient component displayed in CUTE Sidebar (MEM tab).
- * - Displays active runtime and satellite tools versions (pi, cute, gentle-ai, engram, herdr).
+ * WorkspaceEcosystemCard:
+ * - Ambient component displayed in SOLVI Sidebar (MEM tab).
+ * - Displays active runtime and satellite tools versions (pi, solvi, gentle-ai, engram, herdr).
  * - Non-blocking asynchronous version polling with memory cache.
- * - Double-line Dracula / CUTE frame styling.
+ * - Double-line Dracula / SOLVI frame styling.
  */
-export class CinlodevEcosystemCard implements Component {
+export class WorkspaceEcosystemCard implements Component {
 	private readonly ctx: ExtensionContext;
 	private readonly tui: TUI;
 	private readonly theme?: Theme;
@@ -87,14 +87,14 @@ export class CinlodevEcosystemCard implements Component {
 		// Trigger passive detection in background if not yet cached
 		triggerEcosystemDetection(() => this.tui.requestRender());
 
-		const g = cuteGlyphs(this.theme);
-		const colors = loadCuteColors();
+		const g = solviGlyphs(this.theme);
+		const colors = loadSolviColors();
 		const theme = this.theme;
 		const safeWidth = Math.max(30, width);
-		const innerWidth = safeWidth - 4; // ║ + space + content + space + ║
+		const innerWidth = safeWidth - 4; // │ + space + content + space + │
 
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);
-		const palette = cutePalette(this.theme);
+		const palette = solviPalette(this.theme);
 		const c = {
 			...palette,
 			pink: (s: string): string => palette.pinkAccent(s),
@@ -111,7 +111,7 @@ export class CinlodevEcosystemCard implements Component {
 			return `${frame(g.v)} ${truncatedLeft}${pad}${right} ${frame(g.v)}`;
 		};
 
-		const titleGlyph = g.brand || "✿";
+		const titleGlyph = g.brand || "";
 		const titleStr = `${c.pink(titleGlyph)} ${c.gold("Stack")} ${c.muted("·")} ${c.pinkAccent("Ecosistema")}`;
 		const titleLen = calcVisibleWidth(titleStr);
 		const fillTop = Math.max(0, safeWidth - 5 - titleLen);

@@ -8,30 +8,30 @@ import {
 	detectProjectName,
 	formatRelativeTime,
 	resolveDashboardUrl,
-	CinlodevEngramCard,
+	WorkspaceEngramCard,
 	resetEngramCache,
 	DEFAULT_ENGRAM_DASHBOARD,
 	parseEngramSearchOutput,
-	CinlodevEngramHandoffCard,
-} from "../src/cute-engram.ts";
+	WorkspaceEngramHandoffCard,
+} from "../src/solvi-engram.ts";
 import {
-	CinlodevMemoryGraphCard,
-	CinlodevPersistentMemoryCard,
+	WorkspaceMemoryGraphCard,
+	WorkspacePersistentMemoryCard,
 	resolveMemoryGraphDbCandidate,
 	queryMemoryGraphStats,
 	resetMemoryGraphCache,
 	normalizeGitRemoteUrl,
 	resolvePersistentMemoryScope,
-} from "../src/cute-memory-graph.ts";
+} from "../src/solvi-memory-graph.ts";
 import { SIDEBAR_TAB_CARD_MAP } from "../src/sidebar.ts";
 import { resetAll, userConfigFile } from "./test-helpers.ts";
 
-test("cute-engram - detectProjectName, formatRelativeTime, resolveDashboardUrl, and CinlodevEngramCard", () => {
+test("solvi-engram - detectProjectName, formatRelativeTime, resolveDashboardUrl, and WorkspaceEngramCard", () => {
 	resetAll();
 
 	// 1. detectProjectName
 	const proj = detectProjectName(process.cwd());
-	assert.equal(proj, "pi-cinlodev-cute");
+	assert.equal(proj, "solvitu");
 
 	// 2. formatRelativeTime
 	const now = new Date("2026-09-23T12:00:00Z");
@@ -48,7 +48,7 @@ test("cute-engram - detectProjectName, formatRelativeTime, resolveDashboardUrl, 
 	assert.equal(resolveDashboardUrl({ serverUrl: "https://myengram.dev///" }), "https://myengram.dev/dashboard/");
 	assert.equal(resolveDashboardUrl({ serverUrl: "https://engram.example.com" }, "dypos"), "https://engram.example.com/dashboard/projects/dypos");
 
-	// 4. CinlodevEngramCard component
+	// 4. WorkspaceEngramCard component
 	let renderCount = 0;
 	const mockTui: any = {
 		requestRender: () => {
@@ -59,7 +59,7 @@ test("cute-engram - detectProjectName, formatRelativeTime, resolveDashboardUrl, 
 	const mockTheme: any = {
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	};
-	const card = new CinlodevEngramCard(mockCtx, mockTui, mockTheme);
+	const card = new WorkspaceEngramCard(mockCtx, mockTui, mockTheme);
 
 	// Initial render
 	const lines = card.render(80);
@@ -88,7 +88,7 @@ test("cute-engram - detectProjectName, formatRelativeTime, resolveDashboardUrl, 
 });
 
 
-test("cute-engram - parseEngramSearchOutput and CinlodevEngramHandoffCard", () => {
+test("solvi-engram - parseEngramSearchOutput and WorkspaceEngramHandoffCard", () => {
 	resetAll();
 	const sampleSearchOutput = `
 Found 1 memories:
@@ -96,7 +96,7 @@ Found 1 memories:
 [1] #2433 (session_summary) — PR #119: Reemplazo de tab USAGE por AGENTS
     Replaced redundant USAGE sidebar tab (3) with dedicated AGENTS (3) tab.
     95/95 unit tests passing.
-    2026-10-04 03:52:58 | project: pi-cinlodev-cute | scope: project
+    2026-10-04 03:52:58 | project: solvitu | scope: project
 `;
 
 	const parsed = parseEngramSearchOutput(sampleSearchOutput);
@@ -115,7 +115,7 @@ Found 1 memories:
 		},
 	};
 
-	const card = new CinlodevEngramHandoffCard(mockCtx, mockTui, undefined);
+	const card = new WorkspaceEngramHandoffCard(mockCtx, mockTui, undefined);
 	// Set mock cached handoff for rendering test
 	(card as any).cachedHandoff = parsed;
 
@@ -141,7 +141,7 @@ Found 1 memories:
 	);
 });
 
-test("cute-memory-graph - candidate resolution, stats querying and card rendering", async () => {
+test("solvi-memory-graph - candidate resolution, stats querying and card rendering", async () => {
 	resetAll();
 	const tmpDir = path.join(os.tmpdir(), `memory-graph-test-${Date.now()}`);
 	const piDir = path.join(tmpDir, ".pi");
@@ -168,7 +168,7 @@ test("cute-memory-graph - candidate resolution, stats querying and card renderin
 
 		// 4. Render card with stats
 		const mockCtx: any = { cwd: tmpDir };
-		const card = new CinlodevMemoryGraphCard(mockCtx, undefined, undefined, tmpDir);
+		const card = new WorkspaceMemoryGraphCard(mockCtx, undefined, undefined, tmpDir);
 
 		// Set mock cached stats for UI verification
 		(card as any).getCachedOrTrigger = () => ({
@@ -200,7 +200,7 @@ test("cute-memory-graph - candidate resolution, stats querying and card renderin
 		assert.ok(lines.some((l) => l.includes("Arquitectura modular")));
 
 		// 5. Inactive / Not available fallback rendering
-		const emptyCard = new CinlodevMemoryGraphCard(undefined, undefined, undefined, tmpDir);
+		const emptyCard = new WorkspaceMemoryGraphCard(undefined, undefined, undefined, tmpDir);
 		(emptyCard as any).getCachedOrTrigger = () => ({
 			available: false,
 			dbPath: null,
@@ -229,21 +229,21 @@ test("cute-memory-graph - candidate resolution, stats querying and card renderin
 	}
 });
 
-test("cute-persistent-memory - normalizeGitRemoteUrl, scope resolution, and card rendering", async () => {
+test("solvi-persistent-memory - normalizeGitRemoteUrl, scope resolution, and card rendering", async () => {
 	resetAll();
 
 	// 1. normalizeGitRemoteUrl
 	assert.equal(
-		normalizeGitRemoteUrl("git@github.com:CinloDev/pi-cinlodev-cute.git"),
-		"github.com/CinloDev/pi-cinlodev-cute",
+		normalizeGitRemoteUrl("git@github.com:testowner/testrepo.git"),
+		"github.com/testowner/testrepo",
 	);
 	assert.equal(
-		normalizeGitRemoteUrl("https://github.com/CinloDev/pi-cinlodev-cute.git"),
-		"github.com/CinloDev/pi-cinlodev-cute",
+		normalizeGitRemoteUrl("https://github.com/testowner/testrepo.git"),
+		"github.com/testowner/testrepo",
 	);
 	assert.equal(
-		normalizeGitRemoteUrl("ssh://git@github.com/CinloDev/pi-cinlodev-cute.git"),
-		"github.com/CinloDev/pi-cinlodev-cute",
+		normalizeGitRemoteUrl("ssh://git@github.com/testowner/testrepo.git"),
+		"github.com/testowner/testrepo",
 	);
 	assert.equal(normalizeGitRemoteUrl("/local/path/repo.git"), null);
 
@@ -253,13 +253,13 @@ test("cute-persistent-memory - normalizeGitRemoteUrl, scope resolution, and card
 	assert.ok(scope.scopeKey.includes("project"));
 
 	// 3. Persistent Memory Card rendering
-	const card = new CinlodevPersistentMemoryCard(undefined, undefined, undefined, process.cwd());
+	const card = new WorkspacePersistentMemoryCard(undefined, undefined, undefined, process.cwd());
 	(card as any).getCachedOrTrigger = () => ({
 		available: true,
-		dbPath: "/home/cinlodev/.memory/memories.db",
+		dbPath: "/home/testowner/.memory/memories.db",
 		scope: "project",
-		projectName: "github.com/CinloDev/pi-cinlodev-cute",
-		scopeKey: '["project","github.com/CinloDev/pi-cinlodev-cute"]',
+		projectName: "github.com/testowner/testrepo",
+		scopeKey: '["project","github.com/testowner/testrepo"]',
 		projectMemoriesCount: 5,
 		totalMemoriesCount: 12,
 		entitiesCount: 7,
@@ -267,7 +267,7 @@ test("cute-persistent-memory - normalizeGitRemoteUrl, scope resolution, and card
 		indexedCount: 5,
 		pendingCount: 0,
 		serverOnline: true,
-		lastTitle: "Arquitectura de pi-persistent-memory en CUTE",
+		lastTitle: "Arquitectura de pi-persistent-memory en SOLVI",
 		lastTopic: "arch",
 		lastCheckedAt: Date.now(),
 	});
@@ -295,7 +295,7 @@ test("cute-persistent-memory - normalizeGitRemoteUrl, scope resolution, and card
 			sentMessage = msg;
 		},
 	};
-	const cardWithPi = new CinlodevPersistentMemoryCard(
+	const cardWithPi = new WorkspacePersistentMemoryCard(
 		undefined,
 		undefined,
 		undefined,

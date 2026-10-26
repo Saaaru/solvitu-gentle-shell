@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-	cuteGlyphs,
+	solviGlyphs,
 	PETAL_PRESETS,
 	installWelcomeHeaderGuard,
-} from "../src/cute-theme.ts";
-import { loadCuteColors } from "../src/cute-colors.ts";
+} from "../src/solvi-theme.ts";
+import { loadSolviColors } from "../src/solvi-colors.ts";
 import { userConfigFile, resetAll } from "./test-helpers.ts";
 
 test("Theme Glyphs - default Double line and Petal frames", () => {
@@ -16,12 +16,12 @@ test("Theme Glyphs - default Double line and Petal frames", () => {
 		if (fs.existsSync(userConfigFile)) fs.unlinkSync(userConfigFile);
 		resetAll();
 
-		const glyphs = cuteGlyphs();
-		assert.equal(glyphs.tl, "╔");
-		assert.equal(glyphs.tr, "╗");
-		assert.equal(glyphs.h, "═");
-		assert.equal(glyphs.v, "║");
-		assert.deepEqual(glyphs.petalFrames, ["✿", "❀", "❁", "✾"]);
+		const glyphs = solviGlyphs();
+		assert.equal(glyphs.tl, "┌");
+		assert.equal(glyphs.tr, "┐");
+		assert.equal(glyphs.h, "─");
+		assert.equal(glyphs.v, "│");
+		assert.deepEqual(glyphs.petalFrames, ["🐝"]);
 	} finally {
 		if (originalContent !== null) {
 			fs.writeFileSync(userConfigFile, originalContent, "utf8");
@@ -41,13 +41,13 @@ test("Animation Presets - cats, sparkles, hearts, ascii", () => {
 	assert.deepEqual(PETAL_PRESETS.ascii, ["*", "+", "o", "x"]);
 });
 
-test("Cute Colors - defaults and user overrides", () => {
+test("Solvi Colors - defaults and user overrides", () => {
 	const originalContent = fs.existsSync(userConfigFile) ? fs.readFileSync(userConfigFile, "utf8") : null;
 	try {
 		if (fs.existsSync(userConfigFile)) fs.unlinkSync(userConfigFile);
 		resetAll();
 
-		const colors = loadCuteColors();
+		const colors = loadSolviColors();
 		assert.equal(colors.userMessage, "userMessageText");
 		assert.equal(colors.bashMessage, "bash");
 		assert.equal(colors.fetchMessage, "pink");
@@ -76,7 +76,7 @@ test("Cute Colors - defaults and user overrides", () => {
 		);
 		resetAll();
 
-		const overridden = loadCuteColors();
+		const overridden = loadSolviColors();
 		assert.equal(overridden.userMessage, "accent");
 		assert.equal(overridden.gentleCardWarning, "gold");
 		assert.equal(overridden.gentleCardSuccess, "success");
@@ -111,17 +111,17 @@ test("installWelcomeHeaderGuard - protects Welcome Dashboard against late foreig
 	installWelcomeHeaderGuard(mockCtx, () => welcomeActive);
 
 	// 1. Own welcome header installs correctly
-	const cuteFactory: any = () => ({ render: () => ["╔═ la Gentlewoman ═╗"] });
-	cuteFactory.__isCuteWelcome = true;
-	mockCtx.ui.setHeader(cuteFactory);
-	assert.equal(activeHeader, cuteFactory);
+	const solviFactory: any = () => ({ render: () => ["┌─ la Gentlewoman ─┐"] });
+	solviFactory.__isSolviWelcome = true;
+	mockCtx.ui.setHeader(solviFactory);
+	assert.equal(activeHeader, solviFactory);
 
 	// 2. Foreign extension (e.g. gentle-pi startup-banner deferred setTimeout) tries to overwrite
 	const foreignBannerFactory: any = () => ({ render: () => ["GIT: main", "MCP: 3"] });
 	mockCtx.ui.setHeader(foreignBannerFactory);
 
-	// Active header MUST remain the cute factory, foreign overwrite is blocked!
-	assert.equal(activeHeader, cuteFactory, "Foreign overwrite must be blocked while Welcome Dashboard is active");
+	// Active header MUST remain the solvi factory, foreign overwrite is blocked!
+	assert.equal(activeHeader, solviFactory, "Foreign overwrite must be blocked while Welcome Dashboard is active");
 
 	// 3. User disables welcome (/welcome off) -> header is cleared
 	welcomeActive = false;
@@ -136,27 +136,29 @@ test("installWelcomeHeaderGuard - protects Welcome Dashboard against late foreig
 	assert.ok(Array.isArray(rendered));
 });
 
-test("CinlodevCute.json theme - userMessageBg matches toolSuccessBg dark violet", () => {
-	const themePath = fileURLToPath(new URL("../themes/CinlodevCute.json", import.meta.url));
-	assert.ok(fs.existsSync(themePath), "themes/CinlodevCute.json must exist");
+test("Workspace.json theme - userMessageBg and toolSuccessBg current values", () => {
+	// Pins today's palette so unrelated changes get caught; colors are actively being
+	// tuned, so update these literals here when they change on purpose.
+	const themePath = fileURLToPath(new URL("../themes/Workspace.json", import.meta.url));
+	assert.ok(fs.existsSync(themePath), "themes/Workspace.json must exist");
 	const themeJson = JSON.parse(fs.readFileSync(themePath, "utf8"));
-	assert.equal(themeJson.vars.userMessageBg, "#140a28");
-	assert.equal(themeJson.vars.toolSuccessBg, "#140a28");
-	assert.equal(themeJson.vars.userMessageText, "#C5C18E");
+	assert.equal(themeJson.vars.userMessageBg, "#1A0B2E");
+	assert.equal(themeJson.vars.toolSuccessBg, "#0D0221");
+	assert.equal(themeJson.vars.userMessageText, "#E0D4FF");
 	assert.equal(themeJson.colors.userMessageBg, "userMessageBg");
 });
 
-test("CinlodevCute.json theme - strictly conforms to Pi 1.2.0 ThemeJsonSchema", async () => {
-	const themePath = fileURLToPath(new URL("../themes/CinlodevCute.json", import.meta.url));
+test("Workspace.json theme - strictly conforms to Pi 1.2.0 ThemeJsonSchema", async () => {
+	const themePath = fileURLToPath(new URL("../themes/Workspace.json", import.meta.url));
 	const themeJson = JSON.parse(fs.readFileSync(themePath, "utf8"));
 	assert.equal(themeJson.$schema, "https://pi.dev/schemas/theme.schema.json");
 	assert.equal(themeJson.glyphs, undefined, "glyphs must not exist on root");
 
 	// Official Pi 1.2.0 validator check
 	try {
-		const base = "/home/cinlodev/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent";
+		const base = "/home/testuser/.pi/agent/install/releases/1.2.0/node_modules/@earendil-works/pi-coding-agent";
 		const { validateThemeJson } = await import(base + "/dist/modes/interactive/theme/theme-schema.js");
-		assert.doesNotThrow(() => validateThemeJson("CinlodevCute.json", themeJson));
+		assert.doesNotThrow(() => validateThemeJson("Workspace.json", themeJson));
 	} catch (e: any) {
 		if (e?.code === "ERR_MODULE_NOT_FOUND") {
 			return;

@@ -2,8 +2,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { resetActiveProfileCache as resetPathActiveProfileCache, readActiveProfile } from "../cute-paths.ts";
+import { resetActiveProfileCache as resetPathActiveProfileCache, readActiveProfile } from "../solvi-paths.ts";
 
+// Intentionally kept as "cinlodev" (not renamed to solvi): this is the registration key
+// the real external pi-sdd-profiles provider uses to publish its API on globalThis.
+// Changing it would break that integration, since the provider still registers under
+// the original key.
 export const SDD_PROFILES_API_SYMBOL = Symbol.for("cinlodev.sdd-profiles.api");
 
 const PROFILES_CACHE_TTL_MS = 3000;
@@ -74,7 +78,8 @@ export function findSddProfilesDir(): string | null {
 		return null;
 	}
 
-	// 1. Direct probe for existing or common path
+	// 1. Direct probe for existing or common path. "CinloDev" here is the real upstream
+	// repo owner (github.com/CinloDev/pi-sdd-profiles) — not our own naming, so it stays.
 	const directCandidate = path.join(gitBase, "github.com", "CinloDev", "pi-sdd-profiles", "profiles");
 	if (fs.existsSync(directCandidate)) {
 		cachedBuiltinProfilesDir = directCandidate;

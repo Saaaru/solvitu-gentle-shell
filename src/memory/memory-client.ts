@@ -44,7 +44,7 @@ export function resetPersistentMemoryCache(): void {
 export const resetMemoryGraphCache = resetPersistentMemoryCache;
 
 /**
- * Normalizes git remote URL to a clean host/owner/repo format (e.g. github.com/CinloDev/pi-cinlodev-cute)
+ * Normalizes git remote URL to a clean host/owner/repo format (e.g. github.com/owner/repo)
  */
 export function normalizeGitRemoteUrl(rawUrl: string): string | null {
 	const url = rawUrl.trim();
@@ -468,7 +468,7 @@ export async function retainPersistentMemory(
 	const title = options?.title || `Session Snapshot: ${scopeInfo.projectName}`;
 	const topicKey = options?.topicKey || "session.snapshot";
 	const memoryType = options?.type || "session_summary";
-	const sessionId = options?.sessionId || `cute_session_${Date.now()}`;
+	const sessionId = options?.sessionId || `solvi_session_${Date.now()}`;
 
 	// 1. Try node:sqlite DatabaseSync first
 	const db = openSqliteDb(targetPath, false);

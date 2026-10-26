@@ -1,5 +1,5 @@
 import * as cp from "node:child_process";
-import { readGitBranch } from "../cute-paths.ts";
+import { readGitBranch } from "../solvi-paths.ts";
 
 export interface GitStatusCounts {
 	staged: number;

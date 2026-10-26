@@ -1,10 +1,10 @@
-import { loadCuteStrings } from "../cute-strings.ts";
-import { stripAnsi } from "../cute-theme.ts";
+import { loadSolviStrings } from "../solvi-strings.ts";
+import { stripAnsi } from "../solvi-theme.ts";
 
 export const BG_ESCAPE_RE = /\x1b\[(?:48;[0-9;]*|49)m/g;
 export const KEY_HINT_TRAILING_RE = /\s*(?:(?:ctrl|cmd|alt|opt|meta)\+[a-z0-9]+|\S+)?\s*to\s+(?:expand|collapse)\s*$/i;
 
-const RAIL_CHARS = "▎▏▍▌▋▊▉█│║|";
+const RAIL_CHARS = "▎▏▍▌▋▊▉█││|";
 
 // Cache to avoid repeatedly unwrapping immutable message lines on every render tick
 const unwrapCache = new WeakMap<string[], string[]>();
@@ -24,20 +24,20 @@ export function stripBackgroundAnsi(text: string): string {
  */
 export function extractCardHeaderTitle(headerLine: string): string {
 	const plain = stripAnsi(headerLine).trim();
-	let title = plain.replace(/^[╭┌][─═\s]*(?:[✿❀❁✾✣✎★≡⌕+☷⌖$]\s*)?/, "");
-	title = title.replace(/\s*[─═]{2,}.*$/, "").replace(/[╮┐]$/, "").trim();
+	let title = plain.replace(/^[╭┌][──\s]*(?:[✿❀❁✾✣✎★≡⌕+☷⌖$]\s*)?/, "");
+	title = title.replace(/\s*[──]{2,}.*$/, "").replace(/[╮┐]$/, "").trim();
 	title = title.replace(KEY_HINT_TRAILING_RE, "").trim();
 	return title;
 }
 
 /**
- * Strips leading/trailing vertical card borders (│, ║, |) and surrounding ANSI escapes
- * from a card body line so inner content nests cleanly inside CUTE frames.
+ * Strips leading/trailing vertical card borders (│, │, |) and surrounding ANSI escapes
+ * from a card body line so inner content nests cleanly inside SOLVI frames.
  */
 export function stripCardLineBorders(line: string): string {
 	let s = line.replace(BG_ESCAPE_RE, "");
-	s = s.replace(/^((?:\x1b\[[0-9;]*m)*)\s*[│║|]((?:\x1b\[[0-9;]*m)*)\s?/, "");
-	s = s.replace(/\s?((?:\x1b\[[0-9;]*m)*)[│║|]((?:\x1b\[[0-9;]*m)*)\s*$/, "");
+	s = s.replace(/^((?:\x1b\[[0-9;]*m)*)\s*[││|]((?:\x1b\[[0-9;]*m)*)\s?/, "");
+	s = s.replace(/\s?((?:\x1b\[[0-9;]*m)*)[││|]((?:\x1b\[[0-9;]*m)*)\s*$/, "");
 	return s.trimEnd();
 }
 
@@ -59,7 +59,7 @@ export function isToolHeaderLine(line: string): boolean {
  */
 export function isBlankFloatLine(line: string): boolean {
 	const stripped = stripAnsi(line.replace(BG_ESCAPE_RE, "")).trim();
-	return stripped === "" || /^[▎▏▍▌▋▊▉█│║|]$/.test(stripped);
+	return stripped === "" || /^[▎▏▍▌▋▊▉█││|]$/.test(stripped);
 }
 
 /**
@@ -71,7 +71,7 @@ export function isAsciiArtOrBanner(lines: string[]): boolean {
 
 	// 1. Signature check: known banners, custom partner/brand banners, or explicit logo titles
 	const combinedPlain = lines.map((l) => stripAnsi(l)).join("\n");
-	const strings = loadCuteStrings();
+	const strings = loadSolviStrings();
 	const partner = strings.sidebarBanner?.partner?.trim();
 	const brand = strings.sidebarBanner?.brand?.trim();
 
@@ -148,11 +148,11 @@ export function stripFloatLineChrome(line: string): string {
 
 	if (hasRail) {
 		// Strip leading rail without nested quantifier explosion
-		s = s.replace(/^\s*(?:\x1b\[[0-9;]*m)*\s*[▎▏▍▌▋▊▉█│║|](?:\x1b\[[0-9;]*m)*\s?/, "");
+		s = s.replace(/^\s*(?:\x1b\[[0-9;]*m)*\s*[▎▏▍▌▋▊▉█││|](?:\x1b\[[0-9;]*m)*\s?/, "");
 
 		// Strip trailing rail and padding linearly and deterministically (no ReDoS)
 		s = s.trimEnd();
-		s = s.replace(/[▎▏▍▌▋▊▉█│║|](?:\x1b\[[0-9;]*m)*$/, "");
+		s = s.replace(/[▎▏▍▌▋▊▉█││|](?:\x1b\[[0-9;]*m)*$/, "");
 		s = s.replace(/(?:\x1b\[[0-9;]*m|\s)+$/, "");
 	}
 
@@ -186,7 +186,7 @@ export function unwrapNativeCard(lines: string[]): string[] {
 		const plain = stripAnsi(line);
 		const isRdd = /(?:🌹\s*)?rdd\b/i.test(plain) || /^gentle_review(?:_|\b)/i.test(plain);
 		const hasGentleTitle = !isRdd && (plain.includes("Gentle AI") || plain.includes("🤖") || /[\u{1F339}\uFE0E🌹🌷]/u.test(plain));
-		return (plain.includes("╭") || plain.includes("╔")) && hasGentleTitle;
+		return (plain.includes("╭") || plain.includes("┌")) && hasGentleTitle;
 	})) {
 		unwrapCache.set(lines, lines);
 		return lines;

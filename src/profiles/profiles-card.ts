@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { cuteGlyphs, cutePalette, safeFg, bolden } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
+import { solviGlyphs, solviPalette, safeFg, bolden } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
 import {
 	getCachedAccounts,
 	getQuotaThreshold,
@@ -10,7 +10,7 @@ import {
 	formatRelativeReset,
 	cleanDynamicPoolLabel,
 	type QuotaPoolDisplay,
-} from "../cute-usage.ts";
+} from "../solvi-usage.ts";
 import {
 	type SwitcherHitbox,
 	type ProfileItem,
@@ -32,7 +32,7 @@ import { getTaskManagerSummary } from "./profiles-task-sync.ts";
  * 4. Interactive effort toggling (low -> medium -> high).
  * 5. Full-height alignment and mouse wheel internal scrolling.
  */
-export class CinlodevProfilesExtendedCard implements Component {
+export class WorkspaceProfilesExtendedCard implements Component {
 	private readonly tui?: TUI;
 	private readonly theme?: Theme;
 	private readonly cwd?: string;
@@ -120,9 +120,9 @@ export class CinlodevProfilesExtendedCard implements Component {
 
 	render(width: number, availableHeight?: number): string[] {
 		const theme = this.theme;
-		const g = cuteGlyphs(theme);
-		const colors = loadCuteColors();
-		const palette = cutePalette(theme);
+		const g = solviGlyphs(theme);
+		const colors = loadSolviColors();
+		const palette = solviPalette(theme);
 		const c = {
 			...palette,
 			accent: (s: string) => palette.pinkAccent(s),
@@ -135,17 +135,17 @@ export class CinlodevProfilesExtendedCard implements Component {
 		};
 
 		const safeWidth = Math.max(30, width);
-		const innerWidth = safeWidth - 4; // ║ + space + content + space + ║
+		const innerWidth = safeWidth - 4; // │ + space + content + space + │
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);
 
-		const titleStr = `${c.pink(g.brand || "✿")} ${c.pinkBright("Profiles & Clusters")}`;
+		const titleStr = `${c.pink(g.brand || "")} ${c.pinkBright("Profiles & Clusters")}`;
 		const maxTitleLen = Math.max(0, safeWidth - 6);
 		const displayTitle = calcVisibleWidth(titleStr) > maxTitleLen ? truncateAnsiAware(titleStr, maxTitleLen) : titleStr;
 		const titleLen = calcVisibleWidth(displayTitle);
 		const fillTop = Math.max(0, safeWidth - 5 - titleLen);
 		const top = `${frame(`${g.tl}${g.h} `)}${displayTitle}${frame(` ${g.h.repeat(fillTop)}${g.tr}`)}`;
 		const bottom = frame(`${g.bl}${g.h.repeat(safeWidth - 2)}${g.br}`);
-		const divider = frame(`${g.dividerL || "╠"}${g.h.repeat(safeWidth - 2)}${g.dividerR || "╣"}`);
+		const divider = frame(`${g.dividerL || "├"}${g.h.repeat(safeWidth - 2)}${g.dividerR || "┤"}`);
 
 		const boxLine = (left: string, right = ""): string => {
 			let safeRight = right;

@@ -15,8 +15,8 @@ import {
 	formatTranscriptChildren,
 	formatTranscriptChild,
 	isAsciiArtOrBanner,
-} from "../src/cute-transcript.ts";
-import { stripAnsi } from "../src/cute-theme.ts";
+} from "../src/solvi-transcript.ts";
+import { stripAnsi } from "../src/solvi-theme.ts";
 
 const mockTheme = {
 	fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,

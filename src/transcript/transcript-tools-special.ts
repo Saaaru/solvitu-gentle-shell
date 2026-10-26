@@ -1,6 +1,6 @@
 import type { Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg, stripAnsi } from "../cute-theme.ts";
+import { safeFg, stripAnsi } from "../solvi-theme.ts";
 import { unwrapNativeCard } from "./transcript-unwrap.ts";
 import { highlightCodeLine } from "./transcript-highlight.ts";
 import { hasKeptColor } from "./transcript-tools-system.ts";

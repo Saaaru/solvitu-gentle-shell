@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
 	cleanVersionString,
-	resolveCutePackageVersion,
+	resolveSolviPackageVersion,
 	resolveGentleShellPackageVersion,
 	setCachedEcosystemForTesting,
 	getCachedEcosystem,
@@ -10,13 +10,13 @@ import {
 	type EcosystemData,
 } from "../src/ecosystem/ecosystem-client.ts";
 import {
-	CinlodevEcosystemCard,
+	WorkspaceEcosystemCard,
 	formatEcosystemPill,
 } from "../src/ecosystem/ecosystem-card.ts";
-import { cutePalette } from "../src/cute-theme.ts";
+import { solviPalette } from "../src/solvi-theme.ts";
 import { SIDEBAR_TAB_CARD_MAP, resolveSidebarTab } from "../src/sidebar-tabs.ts";
-import { installCinlodevFooter } from "../src/footer.ts";
-import { calcVisibleWidth } from "../src/cute-transcript.ts";
+import { installWorkspaceFooter } from "../src/footer.ts";
+import { calcVisibleWidth } from "../src/solvi-transcript.ts";
 
 test("ecosystem-client - cleanVersionString parses various version outputs cleanly", () => {
 	assert.equal(cleanVersionString("engram 3.4.0\n"), "3.4.0");
@@ -27,8 +27,8 @@ test("ecosystem-client - cleanVersionString parses various version outputs clean
 	assert.equal(cleanVersionString("herdr version 0.9.5-dirty"), "0.9.5-dirty");
 });
 
-test("ecosystem-client - resolveCutePackageVersion reads local package or fallback", () => {
-	const ver = resolveCutePackageVersion();
+test("ecosystem-client - resolveSolviPackageVersion reads local package or fallback", () => {
+	const ver = resolveSolviPackageVersion();
 	assert.ok(typeof ver === "string" && ver.length > 0);
 	assert.match(ver, /^\d+\.\d+\.\d+/);
 });
@@ -56,14 +56,14 @@ test("ecosystem-card - formatEcosystemPill formats available and unavailable too
 	assert.ok(unavailablePill.includes("-"));
 });
 
-test("ecosystem-card - CinlodevEcosystemCard renders within bounds without width overflow", () => {
+test("ecosystem-card - WorkspaceEcosystemCard renders within bounds without width overflow", () => {
 	resetEcosystemCache();
 
 	const mockData: EcosystemData = {
 		detectedAt: Date.now(),
 		tools: [
 			{ id: "pi", name: "pi", version: "1.3.0", available: true, accent: "cyan" },
-			{ id: "cute", name: "cute", version: "1.0.0", available: true, accent: "pink" },
+			{ id: "solvi", name: "solvi", version: "1.0.0", available: true, accent: "pink" },
 			{ id: "gentle-shell", name: "gentle-shell", version: "4.3.0", available: true, accent: "gold" },
 			{ id: "gentle-ai", name: "gentle-ai", version: "4.1.1", available: true, accent: "mint" },
 			{ id: "engram", name: "engram", version: "3.4.0", available: true, accent: "purple" },
@@ -75,7 +75,7 @@ test("ecosystem-card - CinlodevEcosystemCard renders within bounds without width
 
 	const mockCtx: any = {};
 	const mockTui: any = { requestRender() {} };
-	const card = new CinlodevEcosystemCard(mockCtx, mockTui);
+	const card = new WorkspaceEcosystemCard(mockCtx, mockTui);
 
 	const width = 45;
 	const lines = card.render(width);
@@ -112,7 +112,7 @@ test("sidebar tabs - MEM tab includes ecosystem card", () => {
 	assert.ok(memTab.cards.includes("ecosystem"));
 });
 
-test("footer - installCinlodevFooter initializes ecosystemPart and disposes cleanly without ReferenceError", () => {
+test("footer - installWorkspaceFooter initializes ecosystemPart and disposes cleanly without ReferenceError", () => {
 	let registeredFooterFactory: any = null;
 	const mockCtx: any = {
 		hasUI: true,
@@ -128,7 +128,7 @@ test("footer - installCinlodevFooter initializes ecosystemPart and disposes clea
 		on: () => {},
 		getCommandHistory: () => [],
 	};
-	installCinlodevFooter(mockCtx, mockPi);
+	installWorkspaceFooter(mockCtx, mockPi);
 	assert.ok(registeredFooterFactory, "setFooter should have been called");
 
 	const mockTui: any = {

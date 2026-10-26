@@ -1,20 +1,17 @@
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import welcome from "./src/welcome.js";
-import hud from "./src/hud.js";
-import { installCinlodevPrompt, setCinlodevPromptThinkingLevel, setCinlodevPromptWorking } from "./src/editor.js";
-import { installCinlodevFooter, invalidateSidebarGitAndTree, getLatestTodoMirror } from "./src/footer.js";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { installWorkspaceFooter, invalidateSidebarGitAndTree, getLatestTodoMirror } from "./src/footer.js";
 import { sidebarState } from "./src/sidebar.js";
-import { loadCuteStrings, resetCuteStringsCache } from "./src/cute-strings.ts";
-import { loadCutePaths, resetCutePathsCache, resolveDevBinaryPath } from "./src/cute-paths.ts";
-import { installWelcomeHeaderGuard, resetCuteGlyphsCache, transformTranscriptLines, installCuteMarkdownThemeHook } from "./src/cute-theme.ts";
-import { resetCuteLayoutCache } from "./src/cute-layout.ts";
-import { resetCuteColorsCache } from "./src/cute-colors.ts";
-import { syncProjectCloud, detectProjectName } from "./src/cute-engram.ts";
-import { CuteContextMonitor } from "./src/cute-context-monitor.ts";
+import { cycleSidebarTab, resolveSidebarTab } from "./src/sidebar-tabs.ts";
+import { footerRegistry } from "./src/footer/footer-registry.ts";
+import { moveSelection, openSelected } from "./src/main-view.ts";
+import { syncProjectCloud, detectProjectName } from "./src/solvi-engram.ts";
+import { SolviContextMonitor } from "./src/solvi-context-monitor.ts";
+import { installWelcomeBanner } from "./src/welcome.ts";
+import { installWorkspaceStatuses } from "./src/statuses.ts";
+import { COMPACT_TOOLS, compactToolRenderer } from "./src/tool-lines.ts";
 import { setCapabilityOverrides } from "@earendil-works/pi-tui";
-import * as fs from "node:fs";
 
-export default function cinlodevCuteExtension(pi: ExtensionAPI): void {
+export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	// Forzar soporte de Kitty graphics en entornos Ghostty / Kitty
 	try {
 		setCapabilityOverrides({ images: "kitty" });
@@ -25,144 +22,124 @@ export default function cinlodevCuteExtension(pi: ExtensionAPI): void {
 		(globalThis as any)[Symbol.for("gentle-pi.card-style")] = "neon";
 	} catch {}
 
-	// 0. Context Threshold Notifications Monitor (Herdr + Pi toast)
-	const contextMonitor = new CuteContextMonitor();
+	// 0. Context Threshold Notifications Monitor
+	const contextMonitor = new SolviContextMonitor();
 
-	// 1. Initialize Welcome Header (Gentlewoman)
-	welcome(pi);
+	// Compact tool lines: read, write, edit, bash, grep, find and ls draw as "name > target" without a card.
+	// Resolvers run in load order; this package loads after gentle-pi, so its resolver sees the call first.
+	const host = pi as typeof pi & { registerToolRenderer?: (resolver: (toolName: string, next: () => unknown) => unknown) => void };
+	if (typeof host.registerToolRenderer === "function") {
+		host.registerToolRenderer((toolName, next) => (COMPACT_TOOLS.has(toolName) ? compactToolRenderer(toolName) : next()));
+	}
 
-	// 2. Initialize HUD (Cinlodev CUTE)
-	hud(pi);
+	// Alt+Left / Alt+Right move between sidebar tabs
+	const cycleTab = (delta: number) => {
+		const tui = footerRegistry.latestTodoTui;
+		if (tui?.terminal) cycleSidebarTab(tui, delta);
+	};
+	pi.registerShortcut("alt+left", { description: "Previous sidebar tab", handler: () => cycleTab(-1) });
+	pi.registerShortcut("alt+right", { description: "Next sidebar tab", handler: () => cycleTab(1) });
+	// SKILLS tab: Alt+M / Alt+N select a skill or MCP server, Alt+O reads it in the viewer below
+	pi.registerShortcut("alt+m", { description: "Previous skill or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, -1) });
+	pi.registerShortcut("alt+n", { description: "Next skill or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, 1) });
+	pi.registerShortcut("alt+o", { description: "Open the selected skill or MCP item", handler: () => footerRegistry.mainView && openSelected(footerRegistry.mainView) });
 
-	// 3. Hook into session_start to bind Prompt Editor & hygiene
+	// Alt+I / Alt+J scroll or move selection in whatever the active tab shows. Plain arrow
+	// keys stay with the chat input/history. Neither Alt+Up/Alt+Down (reserved by pi for
+	// app.models.reorderUp/Down) nor Alt+K (reserved by gentle-pi's command palette,
+	// gentle:commands) are available: the loader flags either as a startup
+	// "Extension shortcut conflict", and Alt+K silently loses to gentle-pi's own binding.
+	const scrollActiveTab = (delta: number) => {
+		const tui = footerRegistry.latestTodoTui;
+		if (!tui?.terminal) return;
+		const tab = resolveSidebarTab(sidebarState(tui).activeTabId);
+		if (tab.id === "skills") {
+			if (footerRegistry.mainView) moveSelection(footerRegistry.mainView, delta);
+			return;
+		}
+		const card =
+			tab.id === "tree"
+				? footerRegistry.latestProjectTree
+				: tab.id === "git"
+					? (footerRegistry.latestGitGraph ?? footerRegistry.latestWorkingTree)
+					: tab.id === "prof"
+						? footerRegistry.latestProfilesCard
+						: tab.id === "mem"
+							? (footerRegistry.latestEngramCard ?? footerRegistry.latestToolsCard ?? footerRegistry.latestPersistentMemory)
+							: undefined;
+		if (card && typeof (card as any).handleRailWheel === "function") {
+			(card as any).handleRailWheel(delta);
+			tui.requestRender();
+		}
+	};
+	pi.registerShortcut("alt+i", { description: "Scroll active tab up", handler: () => scrollActiveTab(-1) });
+	pi.registerShortcut("alt+j", { description: "Scroll active tab down", handler: () => scrollActiveTab(1) });
+
+	// Shows the bee until the first message, then hands the header slot to installWorkspaceHeader.
+	installWelcomeBanner(pi);
+
+	// 1. Hook into session_start to install the sidebar footer and todo mirror
 	pi.on("session_start", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
 
-		// Install custom prompt editor with double violet frame & pink cursor
-		installCinlodevPrompt(ctx);
-
-		// Install Dracula-style Markdown emphasis hook on global theme
-		installCuteMarkdownThemeHook(ctx.ui.theme);
-
-		// Intercept ctx.ui.setHeader to protect la Gentlewoman Welcome Dashboard
-		// from being overwritten by external extensions (e.g. gentle-pi startup-banner deferred timeout)
-		installWelcomeHeaderGuard(ctx);
-
-		// Intercept ctx.ui.setWidget so any widgets registered by other extensions
-		// (such as gentle-shell-dev-binary warning cards or gentle-todo) render with double line and themed tones.
-		if (ctx.ui && typeof ctx.ui.setWidget === "function" && !(ctx.ui as any).__cuteSetWidgetWrapped) {
-			(ctx.ui as any).__cuteSetWidgetWrapped = true;
+		// Intercept ctx.ui.setWidget so the todo widget always renders in the sidebar rail slot.
+		if (ctx.ui && typeof ctx.ui.setWidget === "function" && !(ctx.ui as any).__solviSetWidgetWrapped) {
+			(ctx.ui as any).__solviSetWidgetWrapped = true;
 			const origSetWidget = ctx.ui.setWidget.bind(ctx.ui);
 			ctx.ui.setWidget = (key: string, content: any, options?: any) => {
-				if (key === "gentle-todo") {
-					if (content === undefined) {
-						return origSetWidget(key, undefined, options);
-					}
-					if (typeof content === "function") {
-						const origFactory = content;
-						content = (tui: any, theme: any) => {
-							const comp = origFactory(tui, theme);
-							const mirror = (tui as any)?.__cuteTodoMirror ?? (ctx as any)?.__cuteTodoMirror ?? getLatestTodoMirror();
-							const cuteRail = (tui as any)?.__cuteTodoRail;
-
-							// Protegemos el slot 'todo' en el sidebar rail para que siempre use nuestro componente CUTE
-							if (cuteRail && tui?.terminal) {
-								const state = sidebarState(tui);
-								state.parts.set("todo", cuteRail);
-							}
-
-							// Si se renderiza como widget bottom (arriba del editor), usamos el marco CUTE
-							// solo si el sidebar no está activo y hay contenido para mostrar
-							if (mirror) {
-								return {
-									render(width: number) {
-										if (tui?.terminal) {
-											const state = sidebarState(tui);
-											if (state.active && state.ownsHost?.()) return [];
-										}
-										const raw = comp?.render?.(width);
-										if (!raw || raw.length === 0) return [];
-										return mirror.renderBottom(width);
-									},
-									handleMouse(event: any) {
-										return mirror.handleMouse(event);
-									},
-									invalidate() {
-										mirror.invalidate();
-									},
-									dispose() {
-										comp?.dispose?.();
-									},
-								};
-							}
-
-							if (!comp || typeof comp.render !== "function") return comp;
-							const origRender = comp.render.bind(comp);
-							return {
-								...comp,
-								render(width: number) {
-									const rawLines = origRender(width);
-									return transformTranscriptLines(rawLines, theme);
-								},
-								dispose() {
-									comp.dispose?.();
-								},
-							};
-						};
-					}
-				} else if (typeof content === "function") {
+				if (key === "gentle-todo" && typeof content === "function") {
 					const origFactory = content;
 					content = (tui: any, theme: any) => {
 						const comp = origFactory(tui, theme);
-						if (!comp || typeof comp.render !== "function") return comp;
-						const origRender = comp.render.bind(comp);
-						return {
-							...comp,
-							render(width: number) {
-								const rawLines = origRender(width);
-								return transformTranscriptLines(rawLines, theme);
-							},
-							dispose() {
-								comp.dispose?.();
-							},
-						};
+						const mirror = (tui as any)?.__solviTodoMirror ?? (ctx as any)?.__solviTodoMirror ?? getLatestTodoMirror();
+						const sidebarRail = (tui as any)?.__solviTodoRail;
+
+						if (sidebarRail && tui?.terminal) {
+							sidebarState(tui).parts.set("todo", sidebarRail);
+						}
+
+						// Bottom widget fallback when the sidebar is not active
+						if (mirror) {
+							return {
+								render(width: number) {
+									if (tui?.terminal) {
+										const state = sidebarState(tui);
+										if (state.active && state.ownsHost?.()) return [];
+									}
+									const raw = comp?.render?.(width);
+									if (!raw || raw.length === 0) return [];
+									return mirror.renderBottom(width);
+								},
+								handleMouse(event: any) {
+									return mirror.handleMouse(event);
+								},
+								invalidate() {
+									mirror.invalidate();
+								},
+								dispose() {
+									comp?.dispose?.();
+								},
+							};
+						}
+						return comp;
 					};
 				}
 				return origSetWidget(key, content, options);
 			};
 		}
 
-		// Install custom CUTE statusline footer
-		installCinlodevFooter(ctx, pi);
+		// Extension statuses (permissions, profile) below the input
+		installWorkspaceStatuses(ctx);
+
+		// Install the sidebar footer (status, context, usage, todo parts)
+		installWorkspaceFooter(ctx, pi);
 
 		// Initialize context threshold monitoring for active session
 		contextMonitor.reset();
 		contextMonitor.check(ctx);
-
-		// Optional hygiene for the foreign gentle-ai dev-binary override file.
-		// Disabled by default (devBinaryHygiene: false in
-		// config/CinlodevCute.paths.json): this theme never deletes files it
-		// does not own unless explicitly opted in.
-		if (loadCutePaths().devBinaryHygiene) {
-			try {
-				const devBinaryPath = resolveDevBinaryPath();
-				if (fs.existsSync(devBinaryPath)) {
-					fs.unlinkSync(devBinaryPath);
-				}
-			} catch {}
-		}
 	});
 
-	// 4. Hook into agent lifecycle to animate working petal & label in input
-	pi.on("agent_start", () => {
-		setCinlodevPromptWorking(true);
-	});
-
-	pi.on("agent_end", () => {
-		setCinlodevPromptWorking(false);
-	});
-
-	// Hook into memory tool execution: sync to Engram Cloud ONLY when memories are saved/mutated
+	// 2. Memory tools: sync to Engram Cloud ONLY when memories are saved/mutated
 	const MEMORY_MUTATION_TOOLS = new Set([
 		"mem_save",
 		"mem_update",
@@ -185,7 +162,7 @@ export default function cinlodevCuteExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	// Monitor context threshold transitions on turn completion
+	// 3. Monitor context threshold transitions on turn completion
 	pi.on("turn_end", async (_event, ctx) => {
 		invalidateSidebarGitAndTree();
 		if (ctx?.hasUI) {
@@ -193,7 +170,7 @@ export default function cinlodevCuteExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	// Reset / re-evaluate monitor on compaction
+	// 4. Reset / re-evaluate monitor on compaction
 	pi.on("session_compact", async (_event, ctx) => {
 		if (ctx?.hasUI) {
 			contextMonitor.reset();
@@ -204,41 +181,4 @@ export default function cinlodevCuteExtension(pi: ExtensionAPI): void {
 	pi.on("session_shutdown", () => {
 		contextMonitor.stop();
 	});
-
-	// 4b. Repintar el marco del input cuando cambia el esfuerzo (thinking level)
-	pi.on("thinking_level_select", () => {
-		try {
-			setCinlodevPromptThinkingLevel(pi.getThinkingLevel());
-		} catch {}
-	});
-
-	// 5. Command to inspect / reapply with hot-reload of configurations
-	const cuteCmdHandler = async (_args: string, ctx: ExtensionCommandContext) => {
-		if (!ctx.hasUI) return;
-		// Clear in-memory caches so changes in ~/.pi/agent/cute.json or project configs load immediately
-		resetCuteGlyphsCache();
-		resetCuteStringsCache();
-		resetCuteLayoutCache();
-		resetCutePathsCache();
-		resetCuteColorsCache();
-
-		installCuteMarkdownThemeHook();
-		installCinlodevPrompt(ctx);
-		installCinlodevFooter(ctx, pi);
-		ctx.ui.notify(loadCuteStrings().commandNotify, "info");
-	};
-
-	const cmdName = loadCuteStrings().commandName || "cute";
-	pi.registerCommand(cmdName, {
-		description: loadCuteStrings().commandDescription,
-		handler: cuteCmdHandler,
-	});
-
-	// Register universal "/cute" alias if commandName was customized or differs
-	if (cmdName !== "cute") {
-		pi.registerCommand("cute", {
-			description: "Reapply CUTE theme aesthetics and reload configuration (/cute)",
-			handler: cuteCmdHandler,
-		});
-	}
 }

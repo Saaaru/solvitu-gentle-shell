@@ -1,15 +1,15 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { cuteGlyphs, cutePalette, frameFg } from "../cute-theme.ts";
-import { loadCuteLayout } from "../cute-layout.ts";
-import { formatProfileDisplay, loadCuteStrings, matchBracketProfile } from "../cute-strings.ts";
-import { getContextThreshold } from "../cute-metrics.ts";
+import { solviGlyphs, solviPalette, frameFg } from "../solvi-theme.ts";
+import { loadSolviLayout } from "../solvi-layout.ts";
+import { formatProfileDisplay, loadSolviStrings, matchBracketProfile } from "../solvi-strings.ts";
+import { getContextThreshold } from "../solvi-metrics.ts";
 
 export function separator(theme: Theme): string {
-	return frameFg(theme, cuteGlyphs(theme).separator);
+	return frameFg(theme, solviGlyphs(theme).separator);
 }
 
 export function gaugeGlyphs(theme: Theme): { filled: string; empty: string } {
-	const g = cuteGlyphs(theme);
+	const g = solviGlyphs(theme);
 	return { filled: g.gaugeFilled, empty: g.gaugeEmpty };
 }
 
@@ -17,7 +17,7 @@ export function gaugeGlyphs(theme: Theme): { filled: string; empty: string } {
 export function prettifyExtraStatus(raw: string, theme: Theme): string {
 	const name = matchBracketProfile(raw);
 	if (name === null) return raw.trim();
-	return formatProfileDisplay(cuteGlyphs(theme).profileIcon, loadCuteStrings().profileFormat, name);
+	return formatProfileDisplay(solviGlyphs(theme).profileIcon, loadSolviStrings().profileFormat, name);
 }
 
 export function shortModelName(modelId: string): string {
@@ -38,14 +38,14 @@ export function sessionCost(ctx: ExtensionContext): number {
 }
 
 export function formatCost(total: number): string {
-	const layout = loadCuteLayout().footer;
+	const layout = loadSolviLayout().footer;
 	return `$${total >= 1 ? total.toFixed(layout.costDecimalsAboveOne) : total.toFixed(layout.costDecimalsBelowOne)}`;
 }
 
 export function renderGauge(theme: Theme, percent: number | null): string {
-	const c = cutePalette(theme);
+	const c = solviPalette(theme);
 	const gauge = gaugeGlyphs(theme);
-	const cells = loadCuteLayout().footer.gaugeCells;
+	const cells = loadSolviLayout().footer.gaugeCells;
 	if (percent === null) {
 		return c.dim(gauge.empty.repeat(cells));
 	}

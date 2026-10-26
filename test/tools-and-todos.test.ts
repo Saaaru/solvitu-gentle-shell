@@ -5,46 +5,43 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as cp from "node:child_process";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { formatTokenCount, getContextThreshold } from "../src/cute-metrics.ts";
-import { readActiveProfile, resetActiveProfileCache } from "../src/cute-paths.ts";
-import { herdrAvailable, notify } from "../src/cute-notify.ts";
-import { CuteContextMonitor } from "../src/cute-context-monitor.ts";
+import { formatTokenCount, getContextThreshold } from "../src/solvi-metrics.ts";
+import { readActiveProfile, resetActiveProfileCache } from "../src/solvi-paths.ts";
+import { herdrAvailable, notify } from "../src/solvi-notify.ts";
+import { SolviContextMonitor } from "../src/solvi-context-monitor.ts";
 import {
 	collectToolCounts,
 	recordToolCall,
 	formatToolPill,
 	wrapToolPills,
-	CinlodevToolsCard,
+	WorkspaceToolsCard,
 	createEmptyToolCounts,
-} from "../src/cute-tools.ts";
-import { CinlodevTodoMirror } from "../src/todos.ts";
+} from "../src/solvi-tools.ts";
+import { WorkspaceTodoMirror } from "../src/todos.ts";
 import { invalidateSidebarGitAndTree } from "../src/footer.ts";
 import { resetAll, userConfigFile } from "./test-helpers.ts";
 
 test("Syntax check across all source files", () => {
 	const srcFiles = [
 		"index.ts",
-		"src/cute-theme.ts",
-		"src/cute-strings.ts",
-		"src/cute-layout.ts",
-		"src/cute-paths.ts",
-		"src/cute-colors.ts",
-		"src/cute-metrics.ts",
-		"src/hud.ts",
+		"src/solvi-theme.ts",
+		"src/solvi-strings.ts",
+		"src/solvi-layout.ts",
+		"src/solvi-paths.ts",
+		"src/solvi-colors.ts",
+		"src/solvi-metrics.ts",
 		"src/footer.ts",
 		"src/sidebar.ts",
 		"src/sidebar-dock.ts",
 		"src/sidebar-tabs.ts",
 		"src/sidebar-state.ts",
-		"src/welcome.ts",
-		"src/editor.ts",
 		"src/todos.ts",
-		"src/cute-transcript.ts",
-		"src/cute-profiles.ts",
-		"src/cute-notify.ts",
-		"src/cute-context-monitor.ts",
-		"src/cute-git-graph.ts",
-		"src/cute-tools.ts",
+		"src/solvi-transcript.ts",
+		"src/solvi-profiles.ts",
+		"src/solvi-notify.ts",
+		"src/solvi-context-monitor.ts",
+		"src/solvi-git-graph.ts",
+		"src/solvi-tools.ts",
 	];
 	for (const f of srcFiles) {
 		assert.ok(fs.existsSync(f), `File exists: ${f}`);
@@ -122,15 +119,15 @@ test("getContextThreshold - dynamic semáforo based on custom percent brackets",
 	assert.equal(critical100.color("test"), "[coral]test[/coral]");
 });
 
-test("cute-paths - readActiveProfile prioritizes project scope over global scope", () => {
+test("solvi-paths - readActiveProfile prioritizes project scope over global scope", () => {
 	resetActiveProfileCache();
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-profile-test-"));
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-profile-test-"));
 	try {
 		const projDir = path.join(tmpDir, ".pi", "profiles");
 		fs.mkdirSync(projDir, { recursive: true });
-		fs.writeFileSync(path.join(projDir, ".active"), "Cinlodev02", "utf8");
+		fs.writeFileSync(path.join(projDir, ".active"), "Workspace02", "utf8");
 		const active = readActiveProfile(tmpDir);
-		assert.equal(active, "Cinlodev02", "should read project-local .active first");
+		assert.equal(active, "Workspace02", "should read project-local .active first");
 	} finally {
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 		resetActiveProfileCache();
@@ -138,7 +135,7 @@ test("cute-paths - readActiveProfile prioritizes project scope over global scope
 });
 
 
-test("cute-notify - herdrAvailable and fallback notification dispatch", () => {
+test("solvi-notify - herdrAvailable and fallback notification dispatch", () => {
 	const origSocket = process.env.HERDR_SOCKET_PATH;
 	const origEnv = process.env.HERDR_ENV;
 
@@ -171,9 +168,9 @@ test("cute-notify - herdrAvailable and fallback notification dispatch", () => {
 	}
 });
 
-test("cute-context-monitor - progressive 2-level thresholds (orange single notice, red 5m recurring, auto-reset)", () => {
+test("solvi-context-monitor - progressive 2-level thresholds (orange single notice, red 5m recurring, auto-reset)", () => {
 	const notifications: Array<{ title: string; body: string; type: string }> = [];
-	const monitor = new CuteContextMonitor({
+	const monitor = new SolviContextMonitor({
 		alertThreshold: 65,
 		criticalThreshold: 80,
 		criticalIntervalMs: 50, // 50ms for unit test speed instead of 5min
@@ -244,7 +241,7 @@ test("cute-context-monitor - progressive 2-level thresholds (orange single notic
 });
 
 
-test("cute-tools - recordToolCall and collectToolCounts categorizes session tools", () => {
+test("solvi-tools - recordToolCall and collectToolCounts categorizes session tools", () => {
 	const counts = createEmptyToolCounts();
 	recordToolCall(counts, "read");
 	recordToolCall(counts, "write");
@@ -310,7 +307,7 @@ test("cute-tools - recordToolCall and collectToolCounts categorizes session tool
 	assert.equal(sessionCounts.total, 4);
 });
 
-test("cute-tools - formatToolPill and wrapToolPills", () => {
+test("solvi-tools - formatToolPill and wrapToolPills", () => {
 	const mockTheme = {
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	} as any;
@@ -336,7 +333,7 @@ test("cute-tools - formatToolPill and wrapToolPills", () => {
 	assert.ok(rows.length >= 2, "Should wrap into multiple lines when width is small");
 });
 
-test("cute-tools - CinlodevToolsCard hides when empty and renders when tools present", () => {
+test("solvi-tools - WorkspaceToolsCard hides when empty and renders when tools present", () => {
 	const mockTheme = {
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	} as any;
@@ -347,7 +344,7 @@ test("cute-tools - CinlodevToolsCard hides when empty and renders when tools pre
 	const emptyCtx = {
 		sessionManager: { getBranch: () => [] },
 	} as any;
-	const emptyCard = new CinlodevToolsCard(emptyCtx, mockTui, mockTheme);
+	const emptyCard = new WorkspaceToolsCard(emptyCtx, mockTui, mockTheme);
 	assert.deepEqual(emptyCard.render(50), [], "Card must return [] when total tool calls is 0");
 
 	// 2. Active session: card renders
@@ -368,7 +365,7 @@ test("cute-tools - CinlodevToolsCard hides when empty and renders when tools pre
 			],
 		},
 	} as any;
-	const activeCard = new CinlodevToolsCard(activeCtx, mockTui, mockTheme);
+	const activeCard = new WorkspaceToolsCard(activeCtx, mockTui, mockTheme);
 	const rendered = activeCard.render(50);
 	assert.ok(rendered.length >= 3, "Rendered card must have top, content rows, and bottom");
 	assert.ok(rendered[0].includes("tools"), "Top header must contain 'tools'");
@@ -385,7 +382,7 @@ test("footer - invalidateSidebarGitAndTree executes safely", () => {
 	});
 });
 
-test("todos - CinlodevTodoMirror renders double-line CUTE card without background leaks", () => {
+test("todos - WorkspaceTodoMirror renders double-line SOLVI card without background leaks", () => {
 	resetAll();
 	const mockCtx: any = {
 		sessionManager: {
@@ -417,15 +414,15 @@ test("todos - CinlodevTodoMirror renders double-line CUTE card without backgroun
 		},
 	};
 
-	const mirror = new CinlodevTodoMirror(mockCtx, mockTui);
+	const mirror = new WorkspaceTodoMirror(mockCtx, mockTui);
 	const lines = mirror.renderRail(40);
 	const joined = lines.join("\n");
 
-	// Marco doble CUTE presente
+	// Marco doble SOLVI presente
 	assert.ok(lines.length >= 5, "Debe tener al menos 5 líneas");
-	assert.ok(lines[0].includes("╔"), "Debe tener esquina superior doble ╔");
-	assert.ok(lines[lines.length - 1].includes("╚"), "Debe tener esquina inferior doble ╚");
-	assert.ok(joined.includes("Todos · 1 of 3"), "Debe incluir el título CUTE con conteo");
+	assert.ok(lines[0].includes("┌"), "Debe tener esquina superior doble ┌");
+	assert.ok(lines[lines.length - 1].includes("└"), "Debe tener esquina inferior doble └");
+	assert.ok(joined.includes("Todos · 1 of 3"), "Debe incluir el título SOLVI con conteo");
 
 	// Cero fondo azul y cero barra float
 	assert.ok(!joined.includes("\x1b[48;"), "No debe tener secuencias de escape de fondo ANSI");
@@ -440,7 +437,7 @@ test("todos - CinlodevTodoMirror renders double-line CUTE card without backgroun
 	assert.ok(joined.includes("↳ Avanzando en el refactor"), "Debe mostrar la nota de la tarea in_progress indentada");
 });
 
-test("todos - CinlodevTodoMirror performs word wrapping for long titles", () => {
+test("todos - WorkspaceTodoMirror performs word wrapping for long titles", () => {
 	resetAll();
 	const longTitle = "Esta es una tarea extremadamente larga que no cabe en una sola linea y debe wrappear";
 	const mockCtx: any = {
@@ -464,7 +461,7 @@ test("todos - CinlodevTodoMirror performs word wrapping for long titles", () => 
 		},
 	};
 
-	const mirror = new CinlodevTodoMirror(mockCtx, { requestRender: () => {} } as any);
+	const mirror = new WorkspaceTodoMirror(mockCtx, { requestRender: () => {} } as any);
 	const width = 36;
 	const lines = mirror.renderRail(width);
 
@@ -480,7 +477,7 @@ test("todos - CinlodevTodoMirror performs word wrapping for long titles", () => 
 	assert.ok(joined.includes("wrappear"), "Debe contener el final del título en otra línea");
 });
 
-test("todos - CinlodevTodoMirror handles mouse wheel scrolling on overflow", () => {
+test("todos - WorkspaceTodoMirror handles mouse wheel scrolling on overflow", () => {
 	resetAll();
 	const manyTasks = Array.from({ length: 25 }, (_, i) => ({
 		id: i + 1,
@@ -514,7 +511,7 @@ test("todos - CinlodevTodoMirror handles mouse wheel scrolling on overflow", () 
 		},
 	};
 
-	const mirror = new CinlodevTodoMirror(mockCtx, mockTui);
+	const mirror = new WorkspaceTodoMirror(mockCtx, mockTui);
 	const initialLines = mirror.renderRail(40);
 	const initialJoined = initialLines.join("\n");
 
@@ -541,7 +538,7 @@ test("todos - CinlodevTodoMirror handles mouse wheel scrolling on overflow", () 
 });
 
 
-test("todos - CinlodevTodoMirror supports full-height availableHeight in renderRail", () => {
+test("todos - WorkspaceTodoMirror supports full-height availableHeight in renderRail", () => {
 	const mockCtx: any = {
 		sessionManager: {
 			getBranch: () => [
@@ -565,7 +562,7 @@ test("todos - CinlodevTodoMirror supports full-height availableHeight in renderR
 		},
 	};
 
-	const mirror = new CinlodevTodoMirror(mockCtx, { requestRender: () => {} } as any);
+	const mirror = new WorkspaceTodoMirror(mockCtx, { requestRender: () => {} } as any);
 	// Invocación estándar (railMaxRows = 20)
 	const standardLines = mirror.renderRail(40);
 	// Con full-height en la pestaña con availableHeight = 45

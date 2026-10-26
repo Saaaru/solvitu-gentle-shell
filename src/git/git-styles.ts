@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg } from "../cute-theme.ts";
+import { safeFg } from "../solvi-theme.ts";
 import type { GitStatusCounts } from "./git-cli.ts";
 
 /**

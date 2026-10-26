@@ -1,8 +1,8 @@
 import type { Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { loadCuteStrings, detectSystemUser } from "../cute-strings.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { safeFg, transformTranscriptLines } from "../cute-theme.ts";
+import { loadSolviStrings, detectSystemUser } from "../solvi-strings.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { safeFg, transformTranscriptLines } from "../solvi-theme.ts";
 import { frameCategoryBox } from "./transcript-ansi.ts";
 import { unwrapNativeCard, isAsciiArtOrBanner } from "./transcript-unwrap.ts";
 import { toolFilePath } from "./transcript-highlight.ts";
@@ -84,7 +84,7 @@ export function isGrepComponent(child: Component): boolean {
 
 /**
  * Format a transcript child component:
- * Frames user messages in the CUTE golden box with ❀, bash executions
+ * Frames user messages in the golden box with 🐝, bash executions
  * in the sunset orange box with >_ bash, while allowing
  * other components (assistant messages, non-bash tools) to render naturally.
  */
@@ -94,14 +94,14 @@ export function formatTranscriptChild(
 	theme?: Theme,
 ): string[] {
 	const name = (child as unknown as { constructor?: { name?: string } })?.constructor?.name ?? "";
-	const strings = loadCuteStrings();
-	const colors = loadCuteColors();
+	const strings = loadSolviStrings();
+	const colors = loadSolviColors();
 	const user = strings.welcomePersona.user || detectSystemUser();
 
 	// User Message (configurable via colors.userMessage, default 'heading' / #E0C27A)
 	if (name === "UserMessageComponent") {
 		const rawLines = child.render(width - 4);
-		return frameCategoryBox(rawLines, `❀ ${user}`, colors.userMessage, width, theme);
+		return frameCategoryBox(rawLines, `🐝 ${user}`, colors.userMessage, width, theme);
 	}
 
 	// Bash execution (single child fallback)
@@ -162,7 +162,7 @@ export function formatTranscriptChild(
 		return frameCategoryBox(styled, memTitle, colors.memoryMessage, width, theme);
 	}
 
-	// Subagent tool execution in cute cyan/accent card (colors.agentMessage / #8BE9FD)
+	// Subagent tool execution in solvi cyan/accent card (colors.agentMessage / #8BE9FD)
 	if (isSubagentComponent(child)) {
 		const rawLines = child.render(width - 4);
 		const unwrapped = unwrapNativeCard(rawLines);
@@ -205,8 +205,8 @@ export function formatTranscriptChildren(
 ): { lines: string[]; mouseChildren: Array<{ component: Component; height: number }> } {
 	const lines: string[] = [];
 	const mouseChildren: Array<{ component: Component; height: number }> = [];
-	const strings = loadCuteStrings();
-	const colors = loadCuteColors();
+	const strings = loadSolviStrings();
+	const colors = loadSolviColors();
 	const user = strings.welcomePersona.user || detectSystemUser();
 
 	const ensureBreathingRoom = () => {
@@ -225,7 +225,7 @@ export function formatTranscriptChildren(
 		if (name === "UserMessageComponent") {
 			ensureBreathingRoom();
 			const rawLines = child.render(width - 4);
-			const boxed = frameCategoryBox(rawLines, `❀ ${user}`, colors.userMessage, width, theme);
+			const boxed = frameCategoryBox(rawLines, `🐝 ${user}`, colors.userMessage, width, theme);
 			mouseChildren.push({ component: child, height: boxed.length });
 			lines.push(...boxed);
 			i++;
@@ -556,7 +556,7 @@ export function formatTranscriptChildren(
 }
 
 /**
- * Renders any generic tool call output cleanly inside a CUTE category box.
+ * Renders any generic tool call output cleanly inside a SOLVI category box.
  */
 export function formatToolCallCard(
 	rawLines: string[],
@@ -565,7 +565,7 @@ export function formatToolCallCard(
 	width = 80,
 ): string[] {
 	const unwrapped = unwrapNativeCard(rawLines);
-	const colors = loadCuteColors();
+	const colors = loadSolviColors();
 	return frameCategoryBox(unwrapped, toolName, colors.readMessage, width, theme);
 }
 

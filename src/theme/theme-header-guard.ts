@@ -4,15 +4,15 @@ export function installWelcomeHeaderGuard(
 	ctx: { ui?: { setHeader?: (content: any) => void } },
 	isWelcomeActive: () => boolean,
 ): void {
-	if (!ctx.ui || typeof ctx.ui.setHeader !== "function" || (ctx.ui as any).__cuteSetHeaderWrapped) {
+	if (!ctx.ui || typeof ctx.ui.setHeader !== "function" || (ctx.ui as any).__solviSetHeaderWrapped) {
 		return;
 	}
-	(ctx.ui as any).__cuteSetHeaderWrapped = true;
+	(ctx.ui as any).__solviSetHeaderWrapped = true;
 	const origSetHeader = ctx.ui.setHeader.bind(ctx.ui);
 
 	ctx.ui.setHeader = (content: any) => {
 		// 1. If it's our own Welcome Dashboard, install it directly
-		if (content && (content as any).__isCuteWelcome) {
+		if (content && (content as any).__isSolviWelcome) {
 			return origSetHeader(content);
 		}
 
@@ -27,7 +27,7 @@ export function installWelcomeHeaderGuard(
 			return;
 		}
 
-		// 4. If welcome is disabled, wrap external content to apply CUTE frames and theme tones
+		// 4. If welcome is disabled, wrap external content to apply SOLVI frames and theme tones
 		if (typeof content === "function") {
 			const origFactory = content;
 			content = (tui: any, theme: any) => {

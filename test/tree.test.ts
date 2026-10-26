@@ -6,15 +6,15 @@ import * as path from "node:path";
 import * as cp from "node:child_process";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
-	CinlodevProjectTreeCard,
+	WorkspaceProjectTreeCard,
 	scanDirectoryTree,
 	launchEditor,
-} from "../src/cute-tree.ts";
+} from "../src/solvi-tree.ts";
 import { resolveSidebarTab, SIDEBAR_TAB_CARD_MAP } from "../src/sidebar.ts";
 import { resetAll } from "./test-helpers.ts";
 
-test("cute-tree - scanDirectoryTree returns sorted directories and files, ignoring default patterns", () => {
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-scan-test-"));
+test("solvi-tree - scanDirectoryTree returns sorted directories and files, ignoring default patterns", () => {
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-scan-test-"));
 	try {
 		fs.mkdirSync(path.join(tempDir, ".git"), { recursive: true });
 		fs.writeFileSync(path.join(tempDir, ".git", "HEAD"), "ref: refs/heads/main");
@@ -91,10 +91,10 @@ test("cute-tree - scanDirectoryTree returns sorted directories and files, ignori
 	}
 });
 
-test("cute-tree - launchEditor behavior falls back gracefully without throwing", () => {
+test("solvi-tree - launchEditor behavior falls back gracefully without throwing", () => {
 	const origHypr = process.env.HYPRLAND_INSTANCE_SIGNATURE;
 	const origTerm = process.env.TERMINAL;
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-launch-test-"));
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-launch-test-"));
 	const testFile = path.join(tempDir, "sample.txt");
 	fs.writeFileSync(testFile, "test");
 
@@ -120,9 +120,9 @@ test("cute-tree - launchEditor behavior falls back gracefully without throwing",
 	}
 });
 
-test("cute-tree - CinlodevProjectTreeCard rendering, box lines, header and files", () => {
+test("solvi-tree - WorkspaceProjectTreeCard rendering, box lines, header and files", () => {
 	resetAll();
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-card-test-"));
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-card-test-"));
 	try {
 		fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
 		fs.writeFileSync(path.join(tempDir, "src", "index.ts"), "console.log('hi');");
@@ -136,7 +136,7 @@ test("cute-tree - CinlodevProjectTreeCard rendering, box lines, header and files
 			},
 		};
 
-		const card = new CinlodevProjectTreeCard(mockCtx, mockTui, undefined, tempDir);
+		const card = new WorkspaceProjectTreeCard(mockCtx, mockTui, undefined, tempDir);
 
 		// Render at width 50
 		const lines = card.render(50);
@@ -157,13 +157,13 @@ test("cute-tree - CinlodevProjectTreeCard rendering, box lines, header and files
 
 		// Box line framing check: middle lines must have vertical borders
 		for (let i = 1; i < lines.length - 1; i++) {
-			assert.ok(lines[i].startsWith("║ ") && lines[i].endsWith(" ║"), `Box line ${i} must have proper borders`);
+			assert.ok(lines[i].startsWith("│ ") && lines[i].endsWith(" │"), `Box line ${i} must have proper borders`);
 		}
 
 		// Empty directory case
 		const emptyDir = path.join(tempDir, "empty");
 		fs.mkdirSync(emptyDir, { recursive: true });
-		const emptyCard = new CinlodevProjectTreeCard(undefined, mockTui, undefined, emptyDir);
+		const emptyCard = new WorkspaceProjectTreeCard(undefined, mockTui, undefined, emptyDir);
 		const emptyLines = emptyCard.render(50);
 		assert.equal(emptyLines.length, 3);
 		assert.ok(emptyLines[1].includes("Sin archivos en el proyecto"));
@@ -175,11 +175,11 @@ test("cute-tree - CinlodevProjectTreeCard rendering, box lines, header and files
 	}
 });
 
-test("cute-tree - handleRailClick directory toggle, expand/collapse all, and editor launch", () => {
+test("solvi-tree - handleRailClick directory toggle, expand/collapse all, and editor launch", () => {
 	resetAll();
 	const origHypr = process.env.HYPRLAND_INSTANCE_SIGNATURE;
 	const origTerm = process.env.TERMINAL;
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-click-test-"));
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-click-test-"));
 
 	try {
 		delete process.env.HYPRLAND_INSTANCE_SIGNATURE;
@@ -198,7 +198,7 @@ test("cute-tree - handleRailClick directory toggle, expand/collapse all, and edi
 			},
 		};
 
-		const card = new CinlodevProjectTreeCard(undefined, mockTui, undefined, tempDir);
+		const card = new WorkspaceProjectTreeCard(undefined, mockTui, undefined, tempDir);
 
 		// Initially "src" is auto-expanded
 		assert.ok(card.getExpandedDirs().has("src"));
@@ -266,9 +266,9 @@ test("cute-tree - handleRailClick directory toggle, expand/collapse all, and edi
 	}
 });
 
-test("cute-tree - handleWheel scrolling for large directory trees", () => {
+test("solvi-tree - handleWheel scrolling for large directory trees", () => {
 	resetAll();
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-wheel-test-"));
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-wheel-test-"));
 	try {
 		// Create 30 files so that tree has 30 rows (maxVisibleRows is 24)
 		for (let i = 0; i < 30; i++) {
@@ -283,7 +283,7 @@ test("cute-tree - handleWheel scrolling for large directory trees", () => {
 			},
 		};
 
-		const card = new CinlodevProjectTreeCard(undefined, mockTui, undefined, tempDir);
+		const card = new WorkspaceProjectTreeCard(undefined, mockTui, undefined, tempDir);
 
 		// Initial render (offset = 0)
 		const initialLines = card.render(50);
@@ -312,10 +312,10 @@ test("cute-tree - handleWheel scrolling for large directory trees", () => {
 		assert.equal(card.handleRailWheel(1), true);
 
 		// Small directory: <= 24 items, handleWheel returns false
-		const smallDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-small-"));
+		const smallDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-small-"));
 		try {
 			fs.writeFileSync(path.join(smallDir, "single.txt"), "hello");
-			const smallCard = new CinlodevProjectTreeCard(undefined, mockTui, undefined, smallDir);
+			const smallCard = new WorkspaceProjectTreeCard(undefined, mockTui, undefined, smallDir);
 			smallCard.render(50);
 			assert.equal(smallCard.handleWheel(1), false);
 			assert.equal(smallCard.handleWheel(-1), false);
@@ -327,9 +327,9 @@ test("cute-tree - handleWheel scrolling for large directory trees", () => {
 	}
 });
 
-test("cute-tree - full-height behavior when terminal rows is set", () => {
+test("solvi-tree - full-height behavior when terminal rows is set", () => {
 	resetAll();
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-full-height-test-"));
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-full-height-test-"));
 	try {
 		const termRows = 45;
 		const railOverhead = 11; // banner, tab bar, spacing & input area overhead
@@ -346,21 +346,21 @@ test("cute-tree - full-height behavior when terminal rows is set", () => {
 			fs.writeFileSync(path.join(tempDir, `small_${i}.txt`), `hello ${i}`);
 		}
 
-		const smallCard = new CinlodevProjectTreeCard(undefined, mockTui, undefined, tempDir);
+		const smallCard = new WorkspaceProjectTreeCard(undefined, mockTui, undefined, tempDir);
 		const smallLines = smallCard.render(50);
 
 		// Verifies rendered lines count matches terminal height minus rail overhead
 		assert.equal(smallLines.length, expectedTotalLines, `Expected ${expectedTotalLines} lines, got ${smallLines.length}`);
 
 		// Verifies empty padding lines when items < targetContentLines
-		const emptyPadLines = smallLines.filter((l) => l.startsWith("║ ") && l.endsWith(" ║") && l.slice(2, -2).trim() === "");
+		const emptyPadLines = smallLines.filter((l) => l.startsWith("│ ") && l.endsWith(" │") && l.slice(2, -2).trim() === "");
 		assert.ok(emptyPadLines.length > 0, "Should have empty padded lines filling vertical space");
 		assert.equal(emptyPadLines.length, targetContentLines - 5, `Expected ${targetContentLines - 5} padded lines`);
 
 		// Explicit availableHeight parameter override test
 		const explicitLines = smallCard.render(50, 32);
 		assert.equal(explicitLines.length, 32, "Explicit availableHeight must set exact card lines count");
-		const explicitPadLines = explicitLines.filter((l) => l.startsWith("║ ") && l.endsWith(" ║") && l.slice(2, -2).trim() === "");
+		const explicitPadLines = explicitLines.filter((l) => l.startsWith("│ ") && l.endsWith(" │") && l.slice(2, -2).trim() === "");
 		assert.equal(explicitPadLines.length, 30 - 5, "Padding must adjust to explicit availableHeight");
 
 		// Clean directory for large items test
@@ -398,7 +398,7 @@ test("cute-tree - full-height behavior when terminal rows is set", () => {
 			requestRender: () => {},
 			terminal: { rows: 12 },
 		};
-		const fallbackCard = new CinlodevProjectTreeCard(undefined, smallTermMockTui, undefined, tempDir);
+		const fallbackCard = new WorkspaceProjectTreeCard(undefined, smallTermMockTui, undefined, tempDir);
 		const fallbackLines = fallbackCard.render(50);
 		// When totalRows (50) > contentCapacity (24), maxVisibleRows is 23 (leaving 1 for indicator)
 		assert.equal(fallbackCard.getMaxVisibleRows(50), 23);
@@ -408,9 +408,9 @@ test("cute-tree - full-height behavior when terminal rows is set", () => {
 		assert.equal(fallbackLines.length, 26);
 
 		// 4. Empty directory with terminal rows >= 15 expands with padding to reach bottom
-		const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-empty-full-"));
+		const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-empty-full-"));
 		try {
-			const emptyCard = new CinlodevProjectTreeCard(undefined, mockTui, undefined, emptyDir);
+			const emptyCard = new WorkspaceProjectTreeCard(undefined, mockTui, undefined, emptyDir);
 			const emptyLines = emptyCard.render(50);
 			assert.equal(emptyLines.length, expectedTotalLines);
 			assert.ok(emptyLines[1].includes("Sin archivos en el proyecto"));
@@ -422,26 +422,26 @@ test("cute-tree - full-height behavior when terminal rows is set", () => {
 	}
 });
 
-test("cute-tree - resolveSidebarTab resolves '5', 'tree', 'TREE' to projectTree", () => {
+test("solvi-tree - resolveSidebarTab resolves '1', 'tree', 'TREE' to projectTree", () => {
 	// Key resolution
-	const tabByKey = resolveSidebarTab("5");
+	const tabByKey = resolveSidebarTab("1");
 	assert.equal(tabByKey.id, "tree");
-	assert.equal(tabByKey.key, "5");
-	assert.equal(tabByKey.label, "TREE");
+	assert.equal(tabByKey.key, "1");
+	assert.equal(tabByKey.label, "MAIN");
 	assert.deepEqual(tabByKey.cards, ["projectTree"]);
 
 	// Lowercase id resolution
 	const tabById = resolveSidebarTab("tree");
 	assert.equal(tabById.id, "tree");
-	assert.equal(tabById.key, "5");
-	assert.equal(tabById.label, "TREE");
+	assert.equal(tabById.key, "1");
+	assert.equal(tabById.label, "MAIN");
 	assert.deepEqual(tabById.cards, ["projectTree"]);
 
-	// Uppercase label resolution
+	// Uppercase id resolution (the id itself, no longer the "TREE" label)
 	const tabByUpper = resolveSidebarTab("TREE");
 	assert.equal(tabByUpper.id, "tree");
-	assert.equal(tabByUpper.key, "5");
-	assert.equal(tabByUpper.label, "TREE");
+	assert.equal(tabByUpper.key, "1");
+	assert.equal(tabByUpper.label, "MAIN");
 	assert.deepEqual(tabByUpper.cards, ["projectTree"]);
 
 	// Aliases
@@ -458,9 +458,9 @@ test("cute-tree - resolveSidebarTab resolves '5', 'tree', 'TREE' to projectTree"
 });
 
 
-test("cute-tree - renders Git status badges and dirty directory bullets", () => {
+test("solvi-tree - renders Git status badges and dirty directory bullets", () => {
 	resetAll();
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-tree-git-"));
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-git-"));
 	try {
 		cp.execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
 		cp.execFileSync("git", ["config", "user.name", "Test"], { cwd: tempDir, stdio: "ignore" });
@@ -474,7 +474,7 @@ test("cute-tree - renders Git status badges and dirty directory bullets", () => 
 		// Modify file to make git dirty
 		fs.writeFileSync(path.join(tempDir, "src", "index.ts"), "console.log(2);", "utf8");
 
-		const card = new CinlodevProjectTreeCard(undefined, undefined, undefined, tempDir);
+		const card = new WorkspaceProjectTreeCard(undefined, undefined, undefined, tempDir);
 		card.getExpandedDirs().add("src");
 		const lines = card.render(60);
 		const joined = lines.join("\n");

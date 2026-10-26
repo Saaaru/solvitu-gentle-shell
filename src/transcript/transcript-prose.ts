@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg, bolden, stripAnsi } from "../cute-theme.ts";
+import { safeFg, bolden, stripAnsi } from "../solvi-theme.ts";
 import { highlightUncoloredSegments } from "./transcript-ansi.ts";
 
 /**

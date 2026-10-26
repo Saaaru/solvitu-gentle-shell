@@ -4,17 +4,18 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { installSidebar, sidebarPart } from "./sidebar.ts";
-import { CinlodevTodoMirror } from "./todos.ts";
-import { CinlodevGitGraphCard, CinlodevWorkingTreeCard } from "./cute-git-graph.ts";
-import { CinlodevToolsCard } from "./cute-tools.ts";
-import { CinlodevEcosystemCard } from "./ecosystem/ecosystem-card.ts";
-import { CinlodevEngramCard, CinlodevEngramHandoffCard } from "./cute-engram.ts";
-import { CinlodevPersistentMemoryCard } from "./cute-persistent-memory.ts";
-import { tuneTuiScroll } from "./cute-layout.ts";
-import { formatTokenCount, getContextThreshold } from "./cute-metrics.ts";
-import { CinlodevProfilesExtendedCard } from "./cute-profiles.ts";
-import { CinlodevProjectTreeCard } from "./cute-tree.ts";
-import { CinlodevYouTubeCard } from "./cute-youtube.ts";
+import { createMainState, MainListCard, MainViewerCard } from "./main-view.ts";
+import { WorkspaceTodoMirror } from "./todos.ts";
+import { WorkspaceGitGraphCard, WorkspaceWorkingTreeCard } from "./solvi-git-graph.ts";
+import { WorkspaceToolsCard } from "./solvi-tools.ts";
+import { WorkspaceEcosystemCard } from "./ecosystem/ecosystem-card.ts";
+import { WorkspaceEngramCard, WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
+import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
+import { tuneTuiScroll } from "./solvi-layout.ts";
+import { formatTokenCount, getContextThreshold } from "./solvi-metrics.ts";
+import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
+import { WorkspaceProjectTreeCard } from "./solvi-tree.ts";
+import { WorkspaceSolviTabCard } from "./solvi-tab.ts";
 import { sidebarState } from "./sidebar-state.ts";
 
 import {
@@ -33,8 +34,8 @@ import {
 	invalidateSidebarGitAndTree,
 } from "./footer/footer-registry.ts";
 
-import { CinlodevCuteFooter } from "./footer/footer-component.ts";
-import { CinlodevCuteContextCard } from "./footer/footer-context-card.ts";
+import { WorkspaceFooter } from "./footer/footer-component.ts";
+import { WorkspaceContextCard } from "./footer/footer-context-card.ts";
 
 export {
 	formatTokenCount,
@@ -48,11 +49,11 @@ export {
 	renderGauge,
 	getLatestTodoMirror,
 	invalidateSidebarGitAndTree,
-	CinlodevCuteFooter,
-	CinlodevCuteContextCard,
+	WorkspaceFooter,
+	WorkspaceContextCard,
 };
 
-export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
+export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI): void {
 	if (!ctx.hasUI) return;
 	if (!footerRegistry.todoHooksInstalled) {
 		footerRegistry.todoHooksInstalled = true;
@@ -65,9 +66,9 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 				footerRegistry.latestEngramHandoff?.invalidate();
 				footerRegistry.latestMemoryGraph?.invalidate();
 				footerRegistry.latestTodoMirror?.invalidate();
-				if (footerRegistry.latestTodoTui && (footerRegistry.latestTodoTui as any).__cuteTodoRail) {
+				if (footerRegistry.latestTodoTui && (footerRegistry.latestTodoTui as any).__solviTodoRail) {
 					const state = sidebarState(footerRegistry.latestTodoTui);
-					state.parts.set("todo", (footerRegistry.latestTodoTui as any).__cuteTodoRail);
+					state.parts.set("todo", (footerRegistry.latestTodoTui as any).__solviTodoRail);
 				}
 				footerRegistry.latestTodoTui?.requestRender();
 			} catch {}
@@ -81,24 +82,30 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 
 	ctx.ui.setFooter((tui, theme, footerData) => {
 		tuneTuiScroll(tui);
-		(tui as any).__cutePi = pi;
-		const bottom = new CinlodevCuteFooter(pi, ctx, tui, theme, footerData);
-		const contextCard = new CinlodevCuteContextCard(ctx, theme);
-		const engramCard = new CinlodevEngramCard(ctx, tui, theme);
-		const engramHandoff = new CinlodevEngramHandoffCard(ctx, tui, theme);
-		const persistentMemory = new CinlodevPersistentMemoryCard(ctx, tui, theme, undefined, pi);
+		(tui as any).__solviPi = pi;
+		const bottom = new WorkspaceFooter(pi, ctx, tui, theme, footerData);
+		const contextCard = new WorkspaceContextCard(ctx, theme);
+		const engramCard = new WorkspaceEngramCard(ctx, tui, theme);
+		const engramHandoff = new WorkspaceEngramHandoffCard(ctx, tui, theme);
+		const persistentMemory = new WorkspacePersistentMemoryCard(ctx, tui, theme, undefined, pi);
 		const memoryGraph = persistentMemory;
-		const gitGraph = new CinlodevGitGraphCard(ctx, tui, theme);
-		const workingTree = new CinlodevWorkingTreeCard(ctx, tui, theme);
-		const toolsCard = new CinlodevToolsCard(ctx, tui, theme);
-		const ecosystemCard = new CinlodevEcosystemCard(ctx, tui, theme);
-		const todos = new CinlodevTodoMirror(ctx, tui, theme);
+		const gitGraph = new WorkspaceGitGraphCard(ctx, tui, theme);
+		const workingTree = new WorkspaceWorkingTreeCard(ctx, tui, theme);
+		const toolsCard = new WorkspaceToolsCard(ctx, tui, theme);
+		const ecosystemCard = new WorkspaceEcosystemCard(ctx, tui, theme);
+		const todos = new WorkspaceTodoMirror(ctx, tui, theme);
 
 		footerRegistry.latestTodoTui = tui;
+		footerRegistry.latestFooterData = footerData as any;
+		const mainView = createMainState(pi);
+		mainView.requestRender = () => tui.requestRender();
+		footerRegistry.mainView = mainView;
+		sidebarState(tui).parts.set("main-list", new MainListCard(mainView, theme));
+		sidebarState(tui).parts.set("main-viewer", new MainViewerCard(mainView, theme));
 		footerRegistry.latestTodoMirror = todos;
-		(tui as any).__cuteTodoMirror = todos;
-		(ctx as any).__cuteTodoMirror = todos;
-		(tui as any).__cuteCtx = ctx;
+		(tui as any).__solviTodoMirror = todos;
+		(ctx as any).__solviTodoMirror = todos;
+		(tui as any).__solviCtx = ctx;
 		footerRegistry.latestGitGraph = gitGraph;
 		footerRegistry.latestWorkingTree = workingTree;
 		footerRegistry.latestToolsCard = toolsCard;
@@ -163,7 +170,8 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 			invalidate: () => ecosystemCard.invalidate(),
 			handleRailClick: (lineIndex: number, button?: string) => ecosystemCard.handleClick(lineIndex, button),
 		};
-		const profilesCard = new CinlodevProfilesExtendedCard(tui, theme, undefined, ctx, pi);
+		const profilesCard = new WorkspaceProfilesExtendedCard(tui, theme, undefined, ctx, pi);
+		footerRegistry.latestProfilesCard = profilesCard;
 		const profilesRail = {
 			render: (width: number, availableHeight?: number) => profilesCard.render(width, availableHeight),
 			invalidate: () => profilesCard.invalidate?.(),
@@ -171,7 +179,7 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 				profilesCard.handleRailClick(lineIndex, button, localX),
 			handleRailWheel: (delta: number) => profilesCard.handleRailWheel(delta),
 		};
-		const projectTreeCard = new CinlodevProjectTreeCard(ctx, tui, theme);
+		const projectTreeCard = new WorkspaceProjectTreeCard(ctx, tui, theme);
 		footerRegistry.latestProjectTree = projectTreeCard;
 		const projectTreeRail = {
 			render: (width: number, availableHeight?: number) => projectTreeCard.render(width, availableHeight),
@@ -191,17 +199,17 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 		const workingTreePart = sidebarPart(tui, "workingTree", { render: () => [] }, workingTreeRail);
 		const toolsPart = sidebarPart(tui, "tools", { render: () => [] }, toolsRail);
 		const ecosystemPart = sidebarPart(tui, "ecosystem", { render: () => [] }, ecosystemRail);
-		const profilesPart = sidebarPart(tui, "cute-profiles", { render: () => [] }, profilesRail);
+		const profilesPart = sidebarPart(tui, "solvi-profiles", { render: () => [] }, profilesRail);
 		const projectTreePart = sidebarPart(tui, "projectTree", { render: () => [] }, projectTreeRail);
-		const youtubePlayerCard = new CinlodevYouTubeCard(tui, theme, ctx);
-		const youtubePlayerRail = {
-			render: (width: number, availableHeight?: number) => youtubePlayerCard.render(width, availableHeight),
-			invalidate: () => youtubePlayerCard.invalidate(),
+		const solviTabCard = new WorkspaceSolviTabCard(tui, theme, ctx);
+		const solviTabRail = {
+			render: (width: number, availableHeight?: number) => solviTabCard.render(width, availableHeight),
+			invalidate: () => solviTabCard.invalidate(),
 			handleRailClick: (lineIndex: number, button?: string, localX?: number) =>
-				youtubePlayerCard.handleRailClick(lineIndex, button, localX),
-			handleRailWheel: (delta: number) => youtubePlayerCard.handleRailWheel(delta),
+				solviTabCard.handleRailClick(lineIndex, button, localX),
+			handleRailWheel: (delta: number) => solviTabCard.handleRailWheel(delta),
 		};
-		const youtubePlayerPart = sidebarPart(tui, "youtubePlayer", { render: () => [] }, youtubePlayerRail);
+		const solviTabPart = sidebarPart(tui, "solviTab", { render: () => [] }, solviTabRail);
 
 		const todoBottom: Component & { dispose?(): void } = {
 			render: (width: number) => todos.renderBottom(width),
@@ -212,7 +220,7 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 			invalidate: () => todos.invalidate(),
 			handleRailWheel: (delta: number) => todos.handleRailWheel(delta),
 		};
-		(tui as any).__cuteTodoRail = todoRail;
+		(tui as any).__solviTodoRail = todoRail;
 		const todoPart = sidebarPart(tui, "todo", todoBottom, todoRail);
 		const uninstall = installSidebar(tui, theme);
 
@@ -233,8 +241,8 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 				toolsPart.dispose?.();
 				profilesPart.dispose?.();
 				projectTreePart.dispose?.();
-				youtubePlayerPart.dispose?.();
-				youtubePlayerCard.dispose?.();
+				solviTabPart.dispose?.();
+				solviTabCard.dispose?.();
 				todoPart.dispose?.();
 			},
 		};
@@ -243,6 +251,6 @@ export function installCinlodevFooter(ctx: ExtensionContext, pi: ExtensionAPI): 
 
 export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
-		installCinlodevFooter(ctx, pi);
+		installWorkspaceFooter(ctx, pi);
 	});
 }

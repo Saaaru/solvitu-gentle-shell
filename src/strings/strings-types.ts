@@ -1,5 +1,5 @@
 /**
- * Customizable Cinlodev CUTE texts. Colors live in themes/CinlodevCute.json
+ * Customizable Workspace texts. Colors live in themes/Workspace.json
  * (consumed via theme.fg()); this module only holds human-readable strings.
  *
  * Defaults are byte-identical to the literals previously hardcoded in
@@ -7,20 +7,20 @@
  * src/editor.ts and index.ts, so the
  * default visual stays unchanged.
  */
-export interface CuteStrings {
-	/** Full brand with glyph, e.g. "◆ Cinlodev CUTE". */
+export interface SolviStrings {
+	/** Full brand with glyph, e.g. "Solvitu". */
 	brandTitle: string;
-	/** Full brand with glyph, e.g. "✿ Cinlodev CUTE". */
+	/** Full brand with glyph, e.g. "Solvitu". */
 	brandShort: string;
-	/** Compact brand with glyph, e.g. "✿ Cinlodev". */
+	/** Compact brand with glyph, e.g. "Solvitu". */
 	brandFallback: string;
 	/** HUD border title (default identical to brandTitle). */
 	hudTitle: string;
-	/** Footer brand text without glyph, e.g. "Cinlodev CUTE". */
+	/** Footer brand text without glyph, e.g. "Solvitu". */
 	footerBrand: string;
-	/** Footer compact brand text without glyph, e.g. "Cinlodev". */
+	/** Footer compact brand text without glyph, e.g. "Solvitu". */
 	footerShort: string;
-	/** Footer brand glyph, e.g. "✿". */
+	/** Footer brand glyph, e.g. "". */
 	footerSymbol: string;
 	hudDescriptions: {
 		hud: string;
@@ -57,7 +57,7 @@ export interface CuteStrings {
 		/** "{tools}" placeholder receives the tool result count. */
 		toolsFmt: string;
 	};
-	/** Sidebar rail banner (sidebar.ts renderCUTESidebarBanner). */
+	/** Sidebar rail banner (sidebar.ts renderWorkspaceSidebarBanner). */
 	sidebarBanner: {
 		full: string;
 		short: string;
@@ -73,9 +73,9 @@ export interface CuteStrings {
 		/** "{remaining}" placeholder receives the overflow count. */
 		moreFmt: string;
 	};
-	/** Footer sidebar card title, e.g. "✿ Status". */
+	/** Footer sidebar card title, e.g. "Status". */
 	statusTitle: string;
-	/** Context sidebar card title, e.g. "✿ Context". */
+	/** Context sidebar card title, e.g. "Context". */
 	contextTitle: string;
 	/** Profile display format with "{icon}" and "{name}" placeholders, e.g. "{icon} {name}". */
 	profileFormat: string;
@@ -116,10 +116,10 @@ export interface CuteStrings {
 	commandNotify: string;
 }
 
-export type CutePersonaMode = "gentleman" | "gentlewoman";
+export type SolviPersonaMode = "gentleman" | "gentlewoman";
 
 export const PERSONA_PRESETS: Record<
-	CutePersonaMode,
+	SolviPersonaMode,
 	{
 		name: string;
 		userRole: string;
@@ -196,53 +196,53 @@ export const PERSONA_PRESETS: Record<
 	},
 };
 
-export const CUTE_STRINGS_FILENAME = "CinlodevCute.strings.json";
+export const SOLVI_STRINGS_FILENAME = "Workspace.strings.json";
 
-const DEFAULTS: CuteStrings = {
-	brandTitle: "◆ Cinlodev CUTE",
-	brandShort: "✿ Cinlodev CUTE",
-	brandFallback: "✿ Cinlodev",
-	hudTitle: "◆ Cinlodev CUTE",
-	footerBrand: "Cinlodev CUTE",
-	footerShort: "Cinlodev",
-	footerSymbol: "✿",
+const DEFAULTS: SolviStrings = {
+	brandTitle: "Solvitu",
+	brandShort: "Solvitu",
+	brandFallback: "Solvitu",
+	hudTitle: "Solvitu",
+	footerBrand: "Solvitu",
+	footerShort: "Solvitu",
+	footerSymbol: "",
 	hudDescriptions: {
-		hud: "Toggle or configure persistent Cinlodev CUTE HUD widget above input (/hud, /hud compact, /hud full, /hud off)",
-		hudStatus: "Toggle the Cinlodev CUTE HUD footer status line",
+		hud: "Toggle or configure persistent Workspace HUD widget above input (/hud, /hud compact, /hud full, /hud off)",
+		hudStatus: "Toggle the Workspace HUD footer status line",
 	},
 	notifys: {
-		notInTui: "Cinlodev CUTE HUD widget is available in TUI mode.",
-		deactivated: "Cinlodev CUTE HUD desactivado",
-		activated: "Cinlodev CUTE HUD activado encima del input",
-		compact: "Cinlodev CUTE HUD modo compacto activado",
-		full: "Cinlodev CUTE HUD modo completo activado",
-		activatedWithMode: "Cinlodev CUTE HUD activado encima del input ({mode})",
-		statusActivated: "Cinlodev CUTE HUD footer status activado",
-		statusDeactivated: "Cinlodev CUTE HUD footer status desactivado",
+		notInTui: "Solvitu HUD widget is available in TUI mode.",
+		deactivated: "Solvitu HUD desactivado",
+		activated: "Solvitu HUD activado encima del input",
+		compact: "Solvitu HUD modo compacto activado",
+		full: "Solvitu HUD modo completo activado",
+		activatedWithMode: "Solvitu HUD activado encima del input ({mode})",
+		statusActivated: "Solvitu HUD footer status activado",
+		statusDeactivated: "Solvitu HUD footer status desactivado",
 		...PERSONA_PRESETS.gentleman.welcomeNotifys,
 		welcomeModeExpanded: "modo expandido",
 		welcomeModeCompact: "modo compacto",
 	},
 	hudStatusLine: {
-		brand: "◆ {user}",
+		brand: "{user}",
 		modelFmt: "model {model}",
 		ctxFmt: "ctx {context}",
 		toolsFmt: "tools {tools}",
 	},
 	sidebarBanner: {
-		full: "✿ Cinlodev CUTE · Gentle-Shell ✿",
-		short: "✿ Cinlodev CUTE ✿",
-		glyph: "✿",
-		brand: "Cinlodev CUTE",
+		full: "Solvitu · Gentle-Shell ",
+		short: "Solvitu ",
+		glyph: "",
+		brand: "Solvitu",
 		partner: "Gentle-Shell",
 	},
 	todos: {
-		glyph: "✿",
+		glyph: "",
 		textFmt: "Todos · {done} of {total}",
 		moreFmt: "+{remaining} más",
 	},
-	statusTitle: "✿ Status",
-	contextTitle: "✿ Context",
+	statusTitle: "Status",
+	contextTitle: "Context",
 	profileFormat: "{icon} {name}",
 	welcomePersona: {
 		name: PERSONA_PRESETS.gentleman.name,
@@ -256,7 +256,7 @@ const DEFAULTS: CuteStrings = {
 	editorHint: "type, or / for commands",
 	welcomeTitles: {
 		...PERSONA_PRESETS.gentleman.welcomeTitles,
-		themeFallback: "Cinlodev CUTE",
+		themeFallback: "Solvitu",
 	},
 	welcomeHotkeys: {
 		interrupt: "interrupt",
@@ -267,9 +267,9 @@ const DEFAULTS: CuteStrings = {
 		expand: "expand",
 		collapse: "collapse",
 	},
-	commandName: "cinlodev",
-	commandDescription: "Check or reapply Cinlodev CUTE aesthetics and widgets (/cinlodev)",
-	commandNotify: "🌸 Cinlodev CUTE: Header, HUD, Editor y Footer CUTE aplicados.",
+	commandName: "solvi",
+	commandDescription: "Check or reapply Workspace aesthetics and widgets (/solvi)",
+	commandNotify: "🐝 Workspace: Header, HUD, Editor y Footer Workspace aplicados.",
 };
 
 export { DEFAULTS };

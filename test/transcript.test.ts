@@ -9,7 +9,7 @@ import {
 	transformTranscriptLines,
 	safeFg,
 	bolden,
-} from "../src/cute-theme.ts";
+} from "../src/solvi-theme.ts";
 import {
 	frameCategoryBox,
 	formatTranscriptChild,
@@ -43,8 +43,8 @@ import {
 	looksLikeReviewLines,
 	extractReviewHeader,
 	formatReviewOutputLines,
-} from "../src/cute-transcript.ts";
-import { isHerdrSession, resolveEdgeInsets, tuneTuiScroll, resetCuteLayoutCache, loadCuteLayout } from "../src/cute-layout.ts";
+} from "../src/solvi-transcript.ts";
+import { isHerdrSession, resolveEdgeInsets, tuneTuiScroll, resetSolviLayoutCache, loadSolviLayout } from "../src/solvi-layout.ts";
 import { resetAll, userConfigFile } from "./test-helpers.ts";
 
 test("unifySidebarCardFrame - sidebar cards keep border tone and never turn green", () => {
@@ -61,11 +61,11 @@ test("unifySidebarCardFrame - sidebar cards keep border tone and never turn gree
 	const bottomTransformed = unifySidebarCardFrame(changesBottom, mockTheme);
 
 	// Must be double-line
-	assert.ok(topTransformed.includes("╔═"));
-	assert.ok(topTransformed.includes("╗"));
-	assert.ok(bodyTransformed.includes("║"));
-	assert.ok(bottomTransformed.includes("╚═"));
-	assert.ok(bottomTransformed.includes("╝"));
+	assert.ok(topTransformed.includes("┌─"));
+	assert.ok(topTransformed.includes("┐"));
+	assert.ok(bodyTransformed.includes("│"));
+	assert.ok(bottomTransformed.includes("└─"));
+	assert.ok(bottomTransformed.includes("┘"));
 
 	// Frame must be in [border] tone, NOT [success]
 	assert.ok(topTransformed.includes("[border]"));
@@ -96,18 +96,18 @@ test("transformTranscriptLines - adapts Gentle AI cards with tulip to double-lin
 	// Card lines transformed
 	assert.ok(transformed[1].includes("🤖 Gentle AI"));
 	assert.ok(!transformed[1].includes("🌷"));
-	assert.ok(transformed[1].includes("╔"));
-	assert.ok(transformed[1].includes("═"));
-	assert.ok(transformed[1].includes("╗"));
+	assert.ok(transformed[1].includes("┌"));
+	assert.ok(transformed[1].includes("─"));
+	assert.ok(transformed[1].includes("┐"));
 	assert.ok(transformed[1].includes("[success]"));
 
-	assert.ok(transformed[2].includes("║"));
+	assert.ok(transformed[2].includes("│"));
 	assert.ok(transformed[2].includes("2 lines"));
 	assert.ok(transformed[2].includes("[success]"));
 
-	assert.ok(transformed[3].includes("╚"));
-	assert.ok(transformed[3].includes("═"));
-	assert.ok(transformed[3].includes("╝"));
+	assert.ok(transformed[3].includes("└"));
+	assert.ok(transformed[3].includes("─"));
+	assert.ok(transformed[3].includes("┘"));
 	assert.ok(transformed[3].includes("[success]"));
 });
 
@@ -128,18 +128,18 @@ test("transformTranscriptLines - adapts Gentle AI warning card (dev binary) to d
 	// Card lines transformed
 	assert.ok(transformed[0].includes("🤖 Gentle AI"));
 	assert.ok(!transformed[0].includes("✿"));
-	assert.ok(transformed[0].includes("╔"));
-	assert.ok(transformed[0].includes("═"));
-	assert.ok(transformed[0].includes("╗"));
+	assert.ok(transformed[0].includes("┌"));
+	assert.ok(transformed[0].includes("─"));
+	assert.ok(transformed[0].includes("┐"));
 	assert.ok(transformed[0].includes("[warning]"));
 
-	assert.ok(transformed[1].includes("║"));
+	assert.ok(transformed[1].includes("│"));
 	assert.ok(transformed[1].includes("/home/user/go/bin/gentle-ai"));
 	assert.ok(transformed[1].includes("[warning]"));
 
-	assert.ok(transformed[2].includes("╚"));
-	assert.ok(transformed[2].includes("═"));
-	assert.ok(transformed[2].includes("╝"));
+	assert.ok(transformed[2].includes("└"));
+	assert.ok(transformed[2].includes("─"));
+	assert.ok(transformed[2].includes("┘"));
 	assert.ok(transformed[2].includes("[warning]"));
 
 	assert.equal(transformed[3], "");
@@ -154,8 +154,8 @@ test("unifyCardFrame - adapts Gentle AI cards to double-line frame and robot gly
 
 	assert.ok(transformed.includes("🤖 Gentle AI"));
 	assert.ok(!transformed.includes("🌹"));
-	assert.ok(transformed.includes("╔"));
-	assert.ok(transformed.includes("╗"));
+	assert.ok(transformed.includes("┌"));
+	assert.ok(transformed.includes("┐"));
 	assert.ok(transformed.includes("[success]"));
 });
 
@@ -168,34 +168,34 @@ test("frameCategoryBox - exact width and double-line framing", () => {
 	const framed = frameCategoryBox(content, "Test Box", "heading", 50, mockTheme);
 
 	assert.equal(framed.length, 4); // top, line 1, line 2, bottom
-	assert.ok(framed[0].includes("╔═"));
+	assert.ok(framed[0].includes("┌─"));
 	assert.ok(framed[0].includes("Test Box"));
-	assert.ok(framed[0].includes("╗"));
+	assert.ok(framed[0].includes("┐"));
 	assert.ok(framed[0].includes("[heading]"));
 
-	assert.ok(framed[1].includes("║"));
+	assert.ok(framed[1].includes("│"));
 	assert.ok(framed[1].includes("line 1"));
-	assert.ok(framed[2].includes("║"));
+	assert.ok(framed[2].includes("│"));
 	assert.ok(framed[2].includes("line 2 with some text"));
 
-	assert.ok(framed[3].includes("╚═"));
-	assert.ok(framed[3].includes("╝"));
+	assert.ok(framed[3].includes("└─"));
+	assert.ok(framed[3].includes("┘"));
 });
 
-test("formatTranscriptChild - frames user messages in CUTE golden box and leaves others natural", () => {
+test("formatTranscriptChild - frames user messages in SOLVI golden box and leaves others natural", () => {
 	const mockTheme = {
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	} as any;
 
-	// 1. User Message (Dorado / heading con ❀)
+	// 1. User Message (Dorado / heading con 🐝)
 	class UserMessageComponent {
 		render() { return ["echo hello from user"]; }
 	}
 	const userFramed = formatTranscriptChild(new UserMessageComponent() as any, 60, mockTheme);
 	assert.ok(userFramed[0].includes("[userMessageText]") || userFramed[0].includes("[userMessageBorder]") || userFramed[0].includes("[heading]"));
-	assert.ok(userFramed[0].includes("❀"));
+	assert.ok(userFramed[0].includes("🐝"));
 	assert.ok(userFramed[1].includes("echo hello from user"));
-	assert.ok(userFramed[2].includes("╚"));
+	assert.ok(userFramed[2].includes("└"));
 
 	// 2. Assistant Message renders naturally, headings slightly bolder and text Dracula highlighted
 	class AssistantMessageComponent {
@@ -213,14 +213,14 @@ test("formatTranscriptChild - frames user messages in CUTE golden box and leaves
 	// Wide width: mock syntax tags ([syntaxKeyword]...) count as visible chars,
 	// with real ANSI themes they are zero-width escapes.
 	const bashRender = formatTranscriptChild(new BashExecutionComponent() as any, 100, mockTheme);
-	assert.ok(bashRender[0].includes("╔═ >_ bash"));
+	assert.ok(bashRender[0].includes("┌─ >_ bash"));
 	assert.ok(bashRender[1].includes("[bashMode]$ [/bashMode]"));
 	assert.ok(bashRender[1].includes("npm test"));
 	// Inside content is Dracula now (number highlighted), no terracotta wash
 	assert.ok(bashRender[2].includes("pass"));
 	assert.ok(bashRender[2].includes("[syntaxNumber]10[/syntaxNumber]"));
 	assert.ok(!bashRender[2].includes("[bashOutput]"));
-	assert.ok(bashRender[3].includes("╚"));
+	assert.ok(bashRender[3].includes("└"));
 
 	// 4. ToolExecutionComponent for bash renders in >_ bash card
 	class ToolExecutionComponent {
@@ -228,7 +228,7 @@ test("formatTranscriptChild - frames user messages in CUTE golden box and leaves
 		render() { return ["$ git status", "On branch develop"]; }
 	}
 	const toolBashRender = formatTranscriptChild(new ToolExecutionComponent() as any, 60, mockTheme);
-	assert.ok(toolBashRender[0].includes("╔═ >_ bash"));
+	assert.ok(toolBashRender[0].includes("┌─ >_ bash"));
 	assert.ok(toolBashRender[1].includes("[bashMode]$ [/bashMode]"));
 	assert.ok(toolBashRender[1].includes("git status"));
 
@@ -245,13 +245,13 @@ test("formatTranscriptChild - frames user messages in CUTE golden box and leaves
 	const toolRender = formatTranscriptChild(new GentleAiToolComponent() as any, 80, mockTheme);
 	assert.ok(toolRender[0].includes("🤖 Gentle AI"));
 	assert.ok(!toolRender[0].includes("🌹"));
-	assert.ok(toolRender[0].includes("╔"));
-	assert.ok(toolRender[0].includes("═"));
-	assert.ok(toolRender[0].includes("╗"));
+	assert.ok(toolRender[0].includes("┌"));
+	assert.ok(toolRender[0].includes("─"));
+	assert.ok(toolRender[0].includes("┐"));
 	assert.ok(toolRender[0].includes("[success]"));
-	assert.ok(toolRender[1].includes("║"));
-	assert.ok(toolRender[2].includes("╚"));
-	assert.ok(toolRender[2].includes("╝"));
+	assert.ok(toolRender[1].includes("│"));
+	assert.ok(toolRender[2].includes("└"));
+	assert.ok(toolRender[2].includes("┘"));
 });
 
 test("formatTranscriptChildren - groups multiple consecutive bash executions into ONE single unified card", () => {
@@ -294,10 +294,10 @@ test("formatTranscriptChildren - groups multiple consecutive bash executions int
 	const { lines, mouseChildren } = formatTranscriptChildren(children, 70, mockTheme);
 
 	// The first 3 consecutive bash commands MUST be merged into ONE single card!
-	// That card starts with ╔═ >_ bash and ends with ╚════
-	const firstCardStart = lines.findIndex((l) => l.includes("╔═ >_ bash"));
+	// That card starts with ┌─ >_ bash and ends with └────
+	const firstCardStart = lines.findIndex((l) => l.includes("┌─ >_ bash"));
 	assert.ok(firstCardStart !== -1, "First bash card must start");
-	const firstCardEnd = lines.findIndex((l, idx) => idx > firstCardStart && l.includes("╚═"));
+	const firstCardEnd = lines.findIndex((l, idx) => idx > firstCardStart && l.includes("└─"));
 	assert.ok(firstCardEnd !== -1, "First bash card must close");
 
 	const cardSlice = lines.slice(firstCardStart, firstCardEnd + 1).join("\n");
@@ -306,7 +306,7 @@ test("formatTranscriptChildren - groups multiple consecutive bash executions int
 	assert.ok(cardSlice.includes("$ npm test"), "Contains third bash command");
 
 	// There should NOT be 3 separate bash cards for the first 3 commands!
-	const allCardHeaders = lines.filter((l) => l.includes("╔═ >_ bash"));
+	const allCardHeaders = lines.filter((l) => l.includes("┌─ >_ bash"));
 	assert.equal(allCardHeaders.length, 2, "Exactly 2 bash cards total: 1 for the first 3 grouped commands, 1 for the trailing command");
 
 	assert.ok(mouseChildren.length >= children.length, "All children must be mapped in mouseLayout with spacers");
@@ -475,10 +475,10 @@ test("formatAssistantProse - formats git status and diff lines inside fences wit
 		"```",
 		"On branch feat/cool-feature",
 		"Changes not staged for commit:",
-		"  modified:   src/cute-agents.ts",
+		"  modified:   src/solvi-agents.ts",
 		"```",
 		"```",
-		" src/cute-agents.ts | 10 +++++-----",
+		" src/solvi-agents.ts | 10 +++++-----",
 		" 1 file changed, 5 insertions(+), 5 deletions(-)",
 		"```",
 		"────────────────────────────",
@@ -496,7 +496,7 @@ test("formatAssistantProse - formats git status and diff lines inside fences wit
 	assert.ok(out.some((l) => l.includes("[heading]Changes not staged for commit:[/heading]")));
 
 	// 4. File status entry: modified in warning, path in write
-	assert.ok(out.some((l) => l.includes("[warning]modified:[/warning]") && l.includes("[write]src/cute-agents.ts[/write]")));
+	assert.ok(out.some((l) => l.includes("[warning]modified:[/warning]") && l.includes("[write]src/solvi-agents.ts[/write]")));
 
 	// 5. Diff stat: file in write, + in mint, - in red
 	assert.ok(out.some((l) => l.includes("[mint]+[/mint]") && l.includes("[red]-[/red]")));
@@ -609,7 +609,7 @@ test("formatTranscriptChild - frames web_search in dusty-rose card", () => {
 	assert.ok(framed[0].includes("[secondary]"));
 	assert.ok(framed[0].includes("search"));
 	assert.ok(framed[1].includes("search 2 queries"));
-	assert.ok(framed[framed.length - 1].includes("╚"));
+	assert.ok(framed[framed.length - 1].includes("└"));
 });
 
 test("isFetchComponent - matches fetch_content, fetch alias and fetch headers, nothing else", () => {
@@ -694,9 +694,9 @@ test("formatTranscriptChild - frames gentle_review in double-line rose card with
 	const framed = formatTranscriptChild(new GentleReviewToolComponent() as any, 120, mockTheme);
 
 	// 1. Double line framing with reviewMessage / gentle tone
-	assert.ok(framed[0].includes("╔═"));
+	assert.ok(framed[0].includes("┌─"));
 	assert.ok(framed[0].includes("🌹 rdd inspect"));
-	assert.ok(framed[0].includes("═╗"));
+	assert.ok(framed[0].includes("─┐"));
 	assert.ok(framed[0].includes("[gentle]"));
 
 	// 2. Float chrome (▎ rails and background escapes) stripped
@@ -713,8 +713,8 @@ test("formatTranscriptChild - frames gentle_review in double-line rose card with
 	assert.ok(plainFramed.some((line) => line.includes("pass: 5 / fail: 0")));
 
 	// 4. Bottom frame double lines
-	assert.ok(framed[framed.length - 1].includes("╚═"));
-	assert.ok(framed[framed.length - 1].includes("═╝"));
+	assert.ok(framed[framed.length - 1].includes("└─"));
+	assert.ok(framed[framed.length - 1].includes("─┘"));
 
 	// 5. Outline card variant unwraps and frames cleanly
 	class OutlineReviewComponent {
@@ -722,16 +722,16 @@ test("formatTranscriptChild - frames gentle_review in double-line rose card with
 		render() {
 			return [
 				"╭─ 🌹 rdd scope ───────────────────────── ctrl+o to expand ╮",
-				"│ scope: src/cute-transcript.ts                            │",
+				"│ scope: src/solvi-transcript.ts                            │",
 				"│ \x1b[32m✔ clean\x1b[39m                                                  │",
 				"╰──────────────────────────────────────────────────────────╯",
 			];
 		}
 	}
 	const outlineFramed = formatTranscriptChild(new OutlineReviewComponent() as any, 100, mockTheme);
-	assert.ok(outlineFramed[0].includes("╔═"));
+	assert.ok(outlineFramed[0].includes("┌─"));
 	assert.ok(outlineFramed[0].includes("🌹 rdd scope"));
-	assert.ok(outlineFramed.some((l) => l.includes("scope: src/cute-transcript.ts")));
+	assert.ok(outlineFramed.some((l) => l.includes("scope: src/solvi-transcript.ts")));
 	assert.ok(outlineFramed.some((l) => l.includes("\x1b[32m✔ clean\x1b[39m")));
 	assert.ok(!outlineFramed.some((l) => l.includes("╭─") || l.includes("╰─")));
 });
@@ -780,7 +780,7 @@ test("formatTranscriptChild - frames fetch_content in pink card with dark backgr
 	assert.ok(framed[0].includes("[pink]"));
 	assert.ok(framed[0].includes("fetch"));
 	assert.ok(framed[1].includes("fetch https://example.com/docs"));
-	assert.ok(framed[framed.length - 1].includes("╚"));
+	assert.ok(framed[framed.length - 1].includes("└"));
 });
 
 test("formatTranscriptChildren - groups consecutive errors into ONE single coral card", () => {
@@ -840,27 +840,27 @@ test("formatWriteDiffLines - highlights diff code, keeps diff tones and headers"
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	} as any;
 
-	assert.ok(toolFileHighlightable("src/cute-transcript.ts"));
+	assert.ok(toolFileHighlightable("src/solvi-transcript.ts"));
 	assert.ok(!toolFileHighlightable("README.md"));
 	assert.ok(!toolFileHighlightable(undefined));
 	assert.equal(toolFilePath({ args: { path: "src/a.ts" } } as any), "src/a.ts");
 	assert.equal(toolFilePath({} as any), undefined);
 	// Fallback detection from header line (tool without args object in component)
-	assert.equal(toolFilePath({} as any, ["edit src/cute-theme.ts", "+1 -0"]), "src/cute-theme.ts");
+	assert.equal(toolFilePath({} as any, ["edit src/solvi-theme.ts", "+1 -0"]), "src/solvi-theme.ts");
 	assert.equal(toolFilePath({} as any, ["✎ write src/hud.ts", "+1 -0"]), "src/hud.ts");
 	assert.equal(toolFilePath({} as any, ["read package.json:1-10"]), "package.json");
 	assert.equal(toolFilePath({ args: { path: "src/foo.ts:20-50" } } as any), "src/foo.ts");
 	assert.equal(toolFilePath({} as any, ["", "   ", "read src/bar.ts"]), "src/bar.ts");
 
 	const raw = [
-		"edit src/cute-transcript.ts",
+		"edit src/solvi-transcript.ts",
 		"✓ +2 / -2",
 		"+258 const styled = format(x); // added",
 		"-12 let old = 1;",
 		" 254 const kept = true;",
 		"ctrl+o to expand",
 	];
-	const styled = formatWriteDiffLines(raw, "src/cute-transcript.ts", mockTheme);
+	const styled = formatWriteDiffLines(raw, "src/solvi-transcript.ts", mockTheme);
 
 	// Header and hint lines pass through untouched
 	assert.equal(styled[0], raw[0]);
@@ -948,12 +948,12 @@ test("formatReadLines - highlights plain read code Dracula-style and preserves h
 	const raw = [
 		"",
 		"   ",
-		"read src/cute-transcript.ts:50-119",
+		"read src/solvi-transcript.ts:50-119",
 		"const x: number = 42;",
 		"    return current;",
 		"ctrl+o to expand",
 	];
-	const styled = formatReadLines(raw, "src/cute-transcript.ts", mockTheme);
+	const styled = formatReadLines(raw, "src/solvi-transcript.ts", mockTheme);
 
 	// Header and hint untouched even with leading empty spacer lines
 	assert.equal(styled[2], raw[2]);
@@ -1113,8 +1113,8 @@ test("terminal insets - herdr reserves edge columns, plain env stays full-bleed"
 	);
 
 	// Layout defaults carry the terminal section
-	resetCuteLayoutCache();
-	const layout = loadCuteLayout();
+	resetSolviLayoutCache();
+	const layout = loadSolviLayout();
 	assert.equal(layout.terminal.insetLeft, 0);
 	assert.equal(layout.terminal.herdrInsetRight, 1);
 });
@@ -1145,13 +1145,13 @@ test("frameCategoryBox - colored long lines keep border and reset (image read re
 	const wide = frameCategoryBox([pink(file)], "✎ read", "read", 100, mockTheme);
 	assert.ok(wide[1].includes(file));
 	assert.ok(wide[1].includes("\x1b[39m"));
-	assert.ok(wide[1].endsWith("[read]║[/read]"));
+	assert.ok(wide[1].endsWith("[read]│[/read]"));
 
 	// Overflows: clean cut with reset, border intact and never pink-bleed
 	const narrow = frameCategoryBox([pink(file)], "✎ read", "read", 60, mockTheme);
-	assert.ok(narrow[1].endsWith("[read]║[/read]"));
+	assert.ok(narrow[1].endsWith("[read]│[/read]"));
 	assert.ok(narrow[1].includes("\x1b[39m"));
-	assert.ok(!/\x1b\[38;2;240;149;200m[^\x1b]*\[read\]║/.test(narrow[1]));
+	assert.ok(!/\x1b\[38;2;240;149;200m[^\x1b]*\[read\]│/.test(narrow[1]));
 });
 
 test("truncateAnsiAware - kitty APC and OSC travel atomic, never counted", () => {
@@ -1172,7 +1172,7 @@ test("frameCategoryBox - smuggled graphics escapes keep border intact", () => {
 	} as any;
 	const gfx = "_G1,a=T,f=100;AAAA\\";
 	const boxed = frameCategoryBox([gfx + "Read image file [image/png]"], "✎ read", "read", 60, mockTheme);
-	assert.ok(boxed[1].startsWith("[read]║[/read]"), "left border intact");
-	assert.ok(boxed[1].endsWith("[read]║[/read]"), "right border intact");
+	assert.ok(boxed[1].startsWith("[read]│[/read]"), "left border intact");
+	assert.ok(boxed[1].endsWith("[read]│[/read]"), "right border intact");
 	assert.ok(boxed[1].includes(gfx), "graphics sequence not severed");
 });

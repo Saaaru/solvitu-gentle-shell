@@ -1,8 +1,8 @@
 import { DEFAULTS } from "./strings-types.ts";
 
 /**
- * Render the active profile as icon plus name without brackets, e.g. "👤 cinlodev".
- * "{icon}" and "{name}" placeholders come from config/CinlodevCute.strings.json
+ * Render the active profile as icon plus name without brackets, e.g. "👤 default".
+ * "{icon}" and "{name}" placeholders come from config/Workspace.strings.json
  * profileFormat; empty inputs fall back to the compiled defaults.
  */
 export function formatProfileDisplay(icon: string, format: string, name: string): string {

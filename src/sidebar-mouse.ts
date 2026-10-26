@@ -1,7 +1,7 @@
 import { deleteAllKittyImages, type TUI } from "@earendil-works/pi-tui";
-import { loadCuteLayout } from "./cute-layout.ts";
+import { loadSolviLayout } from "./solvi-layout.ts";
 import {
-	CUTE_SIDEBAR_TABS,
+	SOLVI_SIDEBAR_TABS,
 	resolveSidebarTab,
 	type TabHitbox,
 } from "./sidebar-tabs.ts";
@@ -25,7 +25,7 @@ export interface SidebarMouseContext {
 }
 
 /**
- * Creates the high-performance mouse event interceptor for the CUTE sidebar rail:
+ * Creates the high-performance mouse event interceptor for the SOLVI sidebar rail:
  * - TabBar clicking and wheel cycling
  * - Card-specific wheel scrolling delegation (handleRailWheel)
  * - Card-specific click delegation (handleRailClick)
@@ -46,7 +46,7 @@ export function createSidebarMouseHandler(ctx: SidebarMouseContext): (event: any
 	return (event: any) => {
 		const scrollTop = (scroll as any).currentScrollTop ?? 0;
 		const targetLine = event.y + scrollTop;
-		const layout = loadCuteLayout().sidebar;
+		const layout = loadSolviLayout().sidebar;
 		const sectionMappings = getSectionMappings();
 		const tabHitboxes = getTabHitboxes();
 		const tabBarLineIndex = getTabBarLineIndex();
@@ -61,10 +61,10 @@ export function createSidebarMouseHandler(ctx: SidebarMouseContext): (event: any
 				event.wheelDelta !== 0
 			) {
 				const currentTab = resolveSidebarTab(state.activeTabId ?? layout.defaultTab);
-				const currentIndex = CUTE_SIDEBAR_TABS.findIndex((t) => t.id === currentTab.id);
+				const currentIndex = SOLVI_SIDEBAR_TABS.findIndex((t) => t.id === currentTab.id);
 				const delta = event.wheelDelta > 0 ? 1 : -1;
-				const nextIndex = (currentIndex + delta + CUTE_SIDEBAR_TABS.length) % CUTE_SIDEBAR_TABS.length;
-				state.activeTabId = CUTE_SIDEBAR_TABS[nextIndex].id;
+				const nextIndex = (currentIndex + delta + SOLVI_SIDEBAR_TABS.length) % SOLVI_SIDEBAR_TABS.length;
+				state.activeTabId = SOLVI_SIDEBAR_TABS[nextIndex].id;
 				try {
 					if (typeof tui?.terminal?.write === "function") {
 						tui.terminal.write(deleteAllKittyImages());

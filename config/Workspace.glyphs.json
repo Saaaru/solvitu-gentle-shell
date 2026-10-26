@@ -1,0 +1,34 @@
+{
+	"_note": "Workspace glyphs: thin single-line frames, no icons except the bee petal.",
+	"frameStyle": "single",
+	"tl": "┌",
+	"tr": "┐",
+	"bl": "└",
+	"br": "┘",
+	"h": "─",
+	"v": "│",
+	"dividerL": "├",
+	"dividerR": "┤",
+	"separator": "│",
+	"dot": "·",
+	"brand": "",
+	"profileIcon": "",
+	"spinnerFrames": [
+		"⠋",
+		"⠙",
+		"⠹",
+		"⠸",
+		"⠼",
+		"⠴",
+		"⠦",
+		"⠧",
+		"⠇",
+		"⠏"
+	],
+	"branch": "",
+	"gaugeFilled": "▰",
+	"gaugeEmpty": "▱",
+	"petalFrames": [
+		"🐝"
+	]
+}

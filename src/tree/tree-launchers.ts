@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { herdrAvailable, launchInHerdrTab, isTestEnvironment } from "../cute-notify.ts";
+import { herdrAvailable, launchInHerdrTab, isTestEnvironment } from "../solvi-notify.ts";
 
 export function isExecutableInPath(name: string): boolean {
 	const pathEnv = process.env.PATH || "";
@@ -52,21 +52,21 @@ export function launchEditor(targetPath?: string, cwd?: string): boolean {
 	try {
 		const terminal = detectTerminal();
 		const termBin = path.basename(terminal).toLowerCase();
-		const winTitle = `CUTE: ${path.basename(filePath)}`;
+		const winTitle = `SOLVI: ${path.basename(filePath)}`;
 
 		let args: string[];
 		switch (termBin) {
 			case "foot":
-				args = ["--app-id=cute-editor", "-T", winTitle, editor, filePath];
+				args = ["--app-id=solvi-editor", "-T", winTitle, editor, filePath];
 				break;
 			case "alacritty":
-				args = ["--class", "cute-editor,cute-editor", "-t", winTitle, "-e", editor, filePath];
+				args = ["--class", "solvi-editor,solvi-editor", "-t", winTitle, "-e", editor, filePath];
 				break;
 			case "kitty":
-				args = ["--class=cute-editor", "-T", winTitle, editor, filePath];
+				args = ["--class=solvi-editor", "-T", winTitle, editor, filePath];
 				break;
 			case "ghostty":
-				args = ["--class=cute-editor", "-e", editor, filePath];
+				args = ["--class=solvi-editor", "-e", editor, filePath];
 				break;
 			default:
 				args = ["-e", editor, filePath];

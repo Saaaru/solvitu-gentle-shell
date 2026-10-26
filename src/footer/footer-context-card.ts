@@ -1,13 +1,13 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
-import { cuteGlyphs, cutePalette, frameFg } from "../cute-theme.ts";
-import { loadCuteLayout } from "../cute-layout.ts";
-import { loadCuteStrings } from "../cute-strings.ts";
-import { formatTokenCount, getContextThreshold } from "../cute-metrics.ts";
+import { solviGlyphs, solviPalette, frameFg } from "../solvi-theme.ts";
+import { loadSolviLayout } from "../solvi-layout.ts";
+import { loadSolviStrings } from "../solvi-strings.ts";
+import { formatTokenCount, getContextThreshold } from "../solvi-metrics.ts";
 import { formatCost } from "./footer-formatters.ts";
 
-export class CinlodevCuteContextCard implements Component {
+export class WorkspaceContextCard implements Component {
 	private readonly ctx: ExtensionContext;
 	private readonly theme: Theme;
 
@@ -17,11 +17,11 @@ export class CinlodevCuteContextCard implements Component {
 	}
 
 	render(width: number): string[] {
-		const safeWidth = Math.max(loadCuteLayout().footer.cardMinWidth, width);
+		const safeWidth = Math.max(loadSolviLayout().footer.cardMinWidth, width);
 		const innerWidth = safeWidth - 4;
-		const c = cutePalette(this.theme);
+		const c = solviPalette(this.theme);
 		const theme = this.theme;
-		const g = cuteGlyphs(theme);
+		const g = solviGlyphs(theme);
 
 		const usage = this.ctx.getContextUsage?.();
 		const contextWindow = usage?.contextWindow ?? this.ctx.model?.contextWindow ?? 128_000;
@@ -40,7 +40,7 @@ export class CinlodevCuteContextCard implements Component {
 			return `${frameFg(theme, g.v)} ${content}${fill} ${frameFg(theme, g.v)}`;
 		};
 
-		const contextTitle = loadCuteStrings().contextTitle;
+		const contextTitle = loadSolviStrings().contextTitle;
 		const titleStr = c.pinkBright(contextTitle);
 		const fillTop = Math.max(0, safeWidth - 4 - visibleWidth(contextTitle) - 1);
 		const top = `${frameFg(theme, `${g.tl}${g.h} `)}${titleStr}${frameFg(theme, ` ${g.h.repeat(fillTop)}${g.tr}`)}`;

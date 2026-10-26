@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg, stripAnsi } from "../cute-theme.ts";
+import { safeFg, stripAnsi } from "../solvi-theme.ts";
 
-export interface CuteFrameOptions {
+export interface SolviFrameOptions {
 	title?: string;
 	toneKey?: string;
 	width: number;
@@ -106,10 +106,10 @@ export function truncateAnsiAware(text: string, maxWidth: number): string {
 }
 
 /**
- * Frames an array of content lines in a symmetric double-line CUTE card:
- * ╔═ Title ══════════════════════════════════════════════════════════════╗
- * ║ content                                                              ║
- * ╚════════════════════════════════════════════════════════════════════════╝
+ * Frames an array of content lines in a symmetric double-line SOLVI card:
+ * ┌─ Title ──────────────────────────────────────────────────────────────┐
+ * │ content                                                              │
+ * └────────────────────────────────────────────────────────────────────────┘
  * Guarantees exact width on every line, closing the quadrant symmetrically.
  */
 export function frameCategoryBox(
@@ -121,7 +121,7 @@ export function frameCategoryBox(
 ): string[] {
 	const color = (s: string): string => (theme ? safeFg(theme, toneKey, s) : s);
 	const safeWidth = Math.max(30, width);
-	const innerWidth = safeWidth - 4; // ║ + space + content + space + ║
+	const innerWidth = safeWidth - 4; // │ + space + content + space + │
 
 	// Clean leading and trailing empty lines
 	const lines = [...rawLines];
@@ -131,17 +131,17 @@ export function frameCategoryBox(
 
 	const titleStr = title ? ` ${title} ` : "";
 	const titleWidth = calcVisibleWidth(titleStr);
-	// ╔═ (2) + titleStr (titleWidth) + ═.repeat(fillLen) + ╗ (1) = safeWidth
+	// ┌─ (2) + titleStr (titleWidth) + ─.repeat(fillLen) + ┐ (1) = safeWidth
 	// fillLen = safeWidth - titleWidth - 3
 	const fillLen = Math.max(0, safeWidth - titleWidth - 3);
-	const top = color("╔═" + titleStr + "═".repeat(fillLen) + "╗");
-	const bot = color("╚" + "═".repeat(safeWidth - 2) + "╝");
+	const top = color("┌─" + titleStr + "─".repeat(fillLen) + "┐");
+	const bot = color("└" + "─".repeat(safeWidth - 2) + "┘");
 
 	const body = lines.map((line) => {
 		const truncated = truncateAnsiAware(line, innerWidth);
 		const w = calcVisibleWidth(truncated);
 		const pad = " ".repeat(Math.max(0, innerWidth - w));
-		return color("║") + " " + truncated + pad + " " + color("║");
+		return color("│") + " " + truncated + pad + " " + color("│");
 	});
 
 	return [top, ...body, bot];

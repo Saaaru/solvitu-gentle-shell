@@ -1,18 +1,18 @@
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg, unifySidebarCardFrame } from "./cute-theme.ts";
-import { loadCuteLayout } from "./cute-layout.ts";
-import { CinlodevProfilesExtendedCard } from "./cute-profiles.ts";
-import { CinlodevGitGraphCard, CinlodevWorkingTreeCard, getGitSyncBadge } from "./cute-git-graph.ts";
-import { CinlodevEngramHandoffCard } from "./cute-engram.ts";
-import { CinlodevProjectTreeCard } from "./cute-tree.ts";
-import { CinlodevPersistentMemoryCard } from "./cute-persistent-memory.ts";
-import { CinlodevYouTubeCard } from "./cute-youtube.ts";
+import { safeFg, unifySidebarCardFrame } from "./solvi-theme.ts";
+import { loadSolviLayout } from "./solvi-layout.ts";
+import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
+import { WorkspaceGitGraphCard, WorkspaceWorkingTreeCard, getGitSyncBadge } from "./solvi-git-graph.ts";
+import { WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
+import { WorkspaceProjectTreeCard } from "./solvi-tree.ts";
+import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
+import { WorkspaceSolviTabCard } from "./solvi-tab.ts";
 import { measureDockMetrics } from "./sidebar-dock.ts";
-import { renderCUTESidebarBanner } from "./sidebar-state.ts";
+import { renderSolviSidebarBanner } from "./sidebar-state.ts";
 import {
 	resolveSidebarTab,
-	renderCuteSidebarTabBar,
+	renderSolviSidebarTabBar,
 	type TabHitbox,
 } from "./sidebar-tabs.ts";
 import type { SectionMapping } from "./sidebar-mouse.ts";
@@ -36,41 +36,41 @@ export interface RailBuilderContext {
 }
 
 /**
- * Builds the complete formatted lines of the CUTE sidebar rail:
+ * Builds the complete formatted lines of the SOLVI sidebar rail:
  * - Calculates heights dynamically down to prompt line (split 50/50 for 2 cards, full height for single/todo)
  * - Lazily instantiates any unmounted cards
- * - Renders CUTE banner, TabBar, cards and hitboxes
+ * - Renders SOLVI banner, TabBar, cards and hitboxes
  */
 export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult {
 	const { state, tui, theme, activeDock, activeTranscript, contentWidth } = ctx;
-	const layout = loadCuteLayout().sidebar;
+	const layout = loadSolviLayout().sidebar;
 	const netWidth = contentWidth - layout.railPadding * 2;
 	const tabsEnabled = layout.tabsEnabled !== false;
 	const activeTab = resolveSidebarTab(state.activeTabId ?? layout.defaultTab);
 	state.activeTabId = activeTab.id;
 
 	const targetCardKeys = !tabsEnabled
-		? ["footer", "context", "engram", "gitGraph", "tools", "cute-profiles", "todo"]
+		? ["footer", "context", "engram", "gitGraph", "tools", "solvi-profiles", "todo"]
 		: activeTab.cards;
 
-	const hasYouTube = targetCardKeys.some(
-		(key) => key === "youtubePlayer" || key === "youtube-player" || key === "yt",
+	const hasSolviTab = targetCardKeys.some(
+		(key) => key === "solviTab" || key === "solvi-tab" || key === "solvi" || key === "yt",
 	);
-	if (!hasYouTube) {
-		const ytCard = state.parts.get("youtubePlayer") as any;
-		if (ytCard && typeof ytCard.clearCover === "function") {
-			ytCard.clearCover();
+	if (!hasSolviTab) {
+		const solviTabCard = state.parts.get("solviTab") as any;
+		if (solviTabCard && typeof solviTabCard.clearCover === "function") {
+			solviTabCard.clearCover();
 		}
 	}
 
-	const branding = renderCUTESidebarBanner(netWidth, theme);
+	const branding = renderSolviSidebarBanner(netWidth, theme);
 	const bannerLinesCount = (branding && branding.length) ? branding.length + 1 : 0;
 	const tabsLinesCount = tabsEnabled ? 2 : 0;
 	const headerLines = 1 + bannerLinesCount + tabsLinesCount + 1;
 
 	let availableCardHeight: number | undefined;
 	let cardHeights: (number | undefined)[] = [];
-	const termRows = tui.terminal?.rows ?? loadCuteLayout().sidebar.fallbackRows ?? 45;
+	const termRows = tui.terminal?.rows ?? loadSolviLayout().sidebar.fallbackRows ?? 45;
 	const dockWidth = Math.max(10, (tui.terminal?.columns ?? 100) - layout.railWidth);
 	const { totalHeight: dockHeight, visibleInputBottomOffset } = measureDockMetrics(activeDock, dockWidth);
 	const transcriptHeight = activeTranscript?.viewportHeight;
@@ -103,7 +103,7 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 				priorLines += raw.length + 1;
 			}
 		}
-		const remainingForTodo = Math.max(loadCuteLayout().todos.railMaxRows, totalTargetHeight - priorLines);
+		const remainingForTodo = Math.max(loadSolviLayout().todos.railMaxRows, totalTargetHeight - priorLines);
 		availableCardHeight = remainingForTodo;
 		const todoIndex = targetCardKeys.indexOf("todo");
 		cardHeights[todoIndex] = remainingForTodo;
@@ -114,42 +114,42 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 			let component = state.parts.get(key);
 			if (
 				!component &&
-				(key === "cute-profiles" || key === "cute-profiles-extended" || key === "profiles")
+				(key === "solvi-profiles" || key === "solvi-profiles-extended" || key === "profiles")
 			) {
 				component =
-					state.parts.get("cute-profiles") ||
-					state.parts.get("cute-profiles-extended") ||
+					state.parts.get("solvi-profiles") ||
+					state.parts.get("solvi-profiles-extended") ||
 					state.parts.get("profiles");
 				if (!component) {
-					component = new CinlodevProfilesExtendedCard(tui, theme);
-					state.parts.set("cute-profiles", component);
+					component = new WorkspaceProfilesExtendedCard(tui, theme);
+					state.parts.set("solvi-profiles", component);
 				}
 			}
 			if (!component && (key === "gitGraph" || key === "git-graph")) {
 				component = state.parts.get("gitGraph") || state.parts.get("git-graph");
 				if (!component) {
-					component = new CinlodevGitGraphCard(undefined as any, tui, theme);
+					component = new WorkspaceGitGraphCard(undefined as any, tui, theme);
 					state.parts.set("gitGraph", component);
 				}
 			}
 			if (!component && (key === "workingTree" || key === "working-tree")) {
 				component = state.parts.get("workingTree") || state.parts.get("working-tree");
 				if (!component) {
-					component = new CinlodevWorkingTreeCard(undefined as any, tui, theme);
+					component = new WorkspaceWorkingTreeCard(undefined as any, tui, theme);
 					state.parts.set("workingTree", component);
 				}
 			}
 			if (!component && (key === "engramHandoff" || key === "engram-handoff")) {
 				component = state.parts.get("engramHandoff") || state.parts.get("engram-handoff");
 				if (!component) {
-					component = new CinlodevEngramHandoffCard(undefined as any, tui, theme);
+					component = new WorkspaceEngramHandoffCard(undefined as any, tui, theme);
 					state.parts.set("engramHandoff", component);
 				}
 			}
 			if (!component && (key === "projectTree" || key === "project-tree")) {
 				component = state.parts.get("projectTree") || state.parts.get("project-tree");
 				if (!component) {
-					component = new CinlodevProjectTreeCard(undefined as any, tui, theme);
+					component = new WorkspaceProjectTreeCard(undefined as any, tui, theme);
 					state.parts.set("projectTree", component);
 				}
 			}
@@ -166,16 +166,16 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 					state.parts.get("memoryGraph") ||
 					state.parts.get("memory-graph");
 				if (!component) {
-					component = new CinlodevPersistentMemoryCard(undefined, tui, theme);
+					component = new WorkspacePersistentMemoryCard(undefined, tui, theme);
 					state.parts.set("persistentMemory", component);
 					state.parts.set("memoryGraph", component);
 				}
 			}
-			if (!component && (key === "youtubePlayer" || key === "youtube-player" || key === "yt")) {
-				component = state.parts.get("youtubePlayer") || state.parts.get("youtube-player") || state.parts.get("yt");
+			if (!component && (key === "solviTab" || key === "solvi-tab" || key === "yt")) {
+				component = state.parts.get("solviTab") || state.parts.get("solvi-tab") || state.parts.get("yt");
 				if (!component) {
-					component = new CinlodevYouTubeCard(tui, theme);
-					state.parts.set("youtubePlayer", component);
+					component = new WorkspaceSolviTabCard(tui, theme);
+					state.parts.set("solviTab", component);
 				}
 			}
 			const renderHeight = (targetCardKeys.length === 1 || targetCardKeys.length === 2 || key === "projectTree" || key === "project-tree" || key === "todo")
@@ -194,8 +194,8 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 				key !== "workingTree" &&
 				key !== "working-tree" &&
 				key !== "tools" &&
-				key !== "cute-profiles" &&
-				key !== "cute-profiles-extended" &&
+				key !== "solvi-profiles" &&
+				key !== "solvi-profiles-extended" &&
 				key !== "profiles" &&
 				key !== "memoryGraph" &&
 				key !== "memory-graph" &&
@@ -203,8 +203,8 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 				key !== "persistent-memory" &&
 				key !== "projectTree" &&
 				key !== "project-tree" &&
-				key !== "youtubePlayer" &&
-				key !== "youtube-player" &&
+				key !== "solviTab" &&
+				key !== "solvi-tab" &&
 				key !== "yt"
 					? rawLines.map((line) => unifySidebarCardFrame(line, theme))
 					: rawLines;
@@ -255,7 +255,7 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 
 	const cwd = (tui as any)?.cwd ?? process.cwd();
 	const gitSyncBadge = getGitSyncBadge(cwd);
-	const { line: tabLine, divider: dividerLine, hitboxes } = renderCuteSidebarTabBar(netWidth, activeTab.id, theme, gitSyncBadge);
+	const { line: tabLine, divider: dividerLine, hitboxes } = renderSolviSidebarTabBar(netWidth, activeTab.id, theme, gitSyncBadge);
 	tabBarLineIndex = railLines.length;
 	railLines.push(" ".repeat(layout.railPadding) + tabLine + " ".repeat(layout.railPadding));
 	tabBarDividerLineIndex = railLines.length;

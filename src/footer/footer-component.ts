@@ -8,11 +8,11 @@ import type { Component, TUI } from "@earendil-works/pi-tui";
 import { visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { cuteGlyphs, cutePalette, frameFg } from "../cute-theme.ts";
-import { loadCuteStrings, matchBracketProfile, detectSystemUser } from "../cute-strings.ts";
-import { loadCuteLayout } from "../cute-layout.ts";
-import { formatCwd, quoteGitCwd } from "../cute-paths.ts";
-import { listAvailableProfiles, switchProfile } from "../cute-profiles.ts";
+import { solviGlyphs, solviPalette, frameFg } from "../solvi-theme.ts";
+import { loadSolviStrings, matchBracketProfile, detectSystemUser } from "../solvi-strings.ts";
+import { loadSolviLayout } from "../solvi-layout.ts";
+import { formatCwd, quoteGitCwd } from "../solvi-paths.ts";
+import { listAvailableProfiles, switchProfile } from "../solvi-profiles.ts";
 import {
 	separator,
 	prettifyExtraStatus,
@@ -24,7 +24,7 @@ import {
 
 const execAsync = promisify(exec);
 
-export class CinlodevCuteFooter implements Component {
+export class WorkspaceFooter implements Component {
 	private readonly pi: ExtensionAPI;
 	private readonly ctx: ExtensionContext;
 	private readonly tui: TUI;
@@ -59,7 +59,7 @@ export class CinlodevCuteFooter implements Component {
 
 	private refreshDirty(): void {
 		const now = Date.now();
-		if (now - this.lastDirtyCheck < loadCuteLayout().footer.dirtyMs) return;
+		if (now - this.lastDirtyCheck < loadSolviLayout().footer.dirtyMs) return;
 		this.lastDirtyCheck = now;
 
 		const cwd = this.ctx.cwd ?? process.cwd();
@@ -79,18 +79,18 @@ export class CinlodevCuteFooter implements Component {
 
 	render(width: number): string[] {
 		this.refreshDirty();
-		const safeWidth = Math.max(loadCuteLayout().footer.minWidth, width);
-		const c = cutePalette(this.theme);
+		const safeWidth = Math.max(loadSolviLayout().footer.minWidth, width);
+		const c = solviPalette(this.theme);
 
-		// 1. Brand segment (texts from config/CinlodevCute.strings.json via loadCuteStrings())
-		const strings = loadCuteStrings();
+		// 1. Brand segment (texts from config/Workspace.strings.json via loadSolviStrings())
+		const strings = loadSolviStrings();
 		const user = strings.welcomePersona.user || detectSystemUser();
 		const brandText = strings.footerBrand.replace("{user}", user);
 		const brandSegment = `${c.pinkBright(strings.footerSymbol)} ${c.pinkAccent(brandText)}`;
 
-		// 2. Git branch & dirty badge (branch glyph via cuteGlyphs)
+		// 2. Git branch & dirty badge (branch glyph via solviGlyphs)
 		const branch = this.footerData.getGitBranch() || "no-git";
-		const branchGlyph = cuteGlyphs(this.theme).branch;
+		const branchGlyph = solviGlyphs(this.theme).branch;
 		const dirtyBadge =
 			this.dirtyCount && this.dirtyCount > 0 ? ` ${c.yellow(`±${this.dirtyCount}`)}` : "";
 		const gitSegment = `${c.text(`${branchGlyph} ${branch}`)}${dirtyBadge}`;
@@ -103,7 +103,7 @@ export class CinlodevCuteFooter implements Component {
 			thinking && thinking !== "off" ? ` ${c.gold(`(${thinking})`)}` : "";
 		const modelSegment = `${c.text(displayModel)}${thinkingLabel}`;
 
-		// 4. Context gauge (cells via cuteGlyphs gaugeFilled/gaugeEmpty)
+		// 4. Context gauge (cells via solviGlyphs gaugeFilled/gaugeEmpty)
 		const usage = this.ctx.getContextUsage?.();
 		const percent = usage?.percent ?? null;
 		const percentStr = percent !== null ? `${Math.round(percent)}%` : "?%";
@@ -150,7 +150,7 @@ export class CinlodevCuteFooter implements Component {
 		}
 		if (visibleWidth(line) > safeWidth) {
 			// 2. Compact git branch if long
-			const branchMax = loadCuteLayout().footer.branchMax;
+			const branchMax = loadSolviLayout().footer.branchMax;
 			const compactBranch =
 				branch.length > branchMax ? `${branch.slice(0, branchMax - 1)}…` : branch;
 			const compactGit = `${c.text(`${branchGlyph} ${compactBranch}`)}${dirtyBadge}`;
@@ -168,7 +168,7 @@ export class CinlodevCuteFooter implements Component {
 			line = joinLine(segments);
 		}
 		if (visibleWidth(line) > safeWidth) {
-			// 5. Shorten brand (texts from config/CinlodevCute.strings.json via loadCuteStrings())
+			// 5. Shorten brand (texts from config/Workspace.strings.json via loadSolviStrings())
 			const shortText = strings.footerShort.replace("{user}", user);
 			const shortBrand = `${c.pinkBright(strings.footerSymbol)} ${c.pinkAccent(shortText)}`;
 			segments = [shortBrand, segments[1]];
@@ -180,9 +180,9 @@ export class CinlodevCuteFooter implements Component {
 
 	renderSidebarCard(width: number): string[] {
 		this.refreshDirty();
-		const safeWidth = Math.max(loadCuteLayout().footer.cardMinWidth, width);
+		const safeWidth = Math.max(loadSolviLayout().footer.cardMinWidth, width);
 		const innerWidth = safeWidth - 4;
-		const c = cutePalette(this.theme);
+		const c = solviPalette(this.theme);
 		const theme = this.theme;
 
 		const cTitle = (s: string) => c.pinkBright(s);
@@ -192,7 +192,7 @@ export class CinlodevCuteFooter implements Component {
 		const cWarning = (s: string) => c.yellow(s);
 		const cMuted = (s: string) => c.muted(s);
 
-		const g = cuteGlyphs(theme);
+		const g = solviGlyphs(theme);
 		const boxLine = (left: string, right = ""): string => {
 			const spaceNeeded = innerWidth - visibleWidth(left) - visibleWidth(right);
 			const pad = " ".repeat(Math.max(1, spaceNeeded));
@@ -201,7 +201,7 @@ export class CinlodevCuteFooter implements Component {
 			return `${frameFg(theme, g.v)} ${content}${fill} ${frameFg(theme, g.v)}`;
 		};
 
-		const statusTitle = loadCuteStrings().statusTitle;
+		const statusTitle = loadSolviStrings().statusTitle;
 		const titleStr = cTitle(statusTitle);
 		const rawTitle = statusTitle;
 		const fillTop = Math.max(0, safeWidth - 4 - visibleWidth(rawTitle) - 1);
@@ -212,7 +212,7 @@ export class CinlodevCuteFooter implements Component {
 		const shortCwd = formatCwd(rawCwd);
 
 		const branch = this.footerData.getGitBranch() || "no-git";
-		const cardBranchGlyph = cuteGlyphs(theme).branch;
+		const cardBranchGlyph = solviGlyphs(theme).branch;
 		const dirtyBadge = this.dirtyCount && this.dirtyCount > 0 ? ` ${cWarning(`±${this.dirtyCount}`)}` : "";
 
 		const rawModel = this.ctx.model?.id ?? "no-model";
@@ -259,13 +259,13 @@ export class CinlodevCuteFooter implements Component {
 
 		if (otherStatuses.length > 0 || hasProfiles) {
 			lines.push(frameFg(theme, `${g.dividerL}${g.h.repeat(safeWidth - 2)}${g.dividerR}`));
-			for (const status of otherStatuses.slice(0, loadCuteLayout().footer.extraMax)) {
+			for (const status of otherStatuses.slice(0, loadSolviLayout().footer.extraMax)) {
 				lines.push(boxLine(cMuted(status)));
 			}
 
 			if (hasProfiles) {
 				const arrow = this.isProfileExpanded ? "▾" : "▸";
-				const profileGlyph = cuteGlyphs(theme).profileIcon || "🤖";
+				const profileGlyph = solviGlyphs(theme).profileIcon || "🤖";
 				const profileHeaderLeft = `${profileGlyph} ${cMuted(activeName)}`;
 				const profileHeaderRight = cAccent(arrow);
 

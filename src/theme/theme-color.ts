@@ -3,13 +3,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadCuteColors } from "../cute-colors.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
 
 /**
- * Compatible mappings for CUTE visual roles to official Pi THEME_TOKENS or explicit hex codes.
+ * Compatible mappings for SOLVI visual roles to official Pi THEME_TOKENS or explicit hex codes.
  * Ensures custom theme variables continue rendering cleanly without violating Pi 1.2.0 schema.
  */
-const CUTE_ROLE_MAPPINGS: Record<string, string> = {
+const SOLVI_ROLE_MAPPINGS: Record<string, string> = {
 	heading: "mdHeading",
 	userMessageBorder: "userMessageText",
 	pink: "accent",
@@ -42,7 +42,7 @@ export function safeFg(theme: Theme, key: string, text: string, fallback = "text
 	try {
 		return theme.fg(key as any, text);
 	} catch {
-		const mapped = CUTE_ROLE_MAPPINGS[key];
+		const mapped = SOLVI_ROLE_MAPPINGS[key];
 		if (mapped) {
 			if (mapped.startsWith("#") && /^#[0-9a-fA-F]{6}$/.test(mapped)) {
 				const r = parseInt(mapped.slice(1, 3), 16);
@@ -88,14 +88,14 @@ export function bolden(theme: Theme | undefined, text: string): string {
  * - `theme.bold(text)` styles bold text in bright pastel pink (#FFB1DD)
  *   instead of terminal white, giving markdown emphasis distinctive elegance.
  */
-export function installCuteMarkdownThemeHook(themeInstance?: unknown): void {
+export function installSolviMarkdownThemeHook(themeInstance?: unknown): void {
 	const THEME_KEY = Symbol.for("@earendil-works/pi-coding-agent:theme");
 	const THEME_KEY_OLD = Symbol.for("@mariozechner/pi-coding-agent:theme");
 	const target: any =
 		themeInstance ?? (globalThis as any)[THEME_KEY] ?? (globalThis as any)[THEME_KEY_OLD];
 	if (!target || typeof target !== "object") return;
-	if (target.__cuteBoldHookInstalled) return;
-	target.__cuteBoldHookInstalled = true;
+	if (target.__solviBoldHookInstalled) return;
+	target.__solviBoldHookInstalled = true;
 
 	const origBold = typeof target.bold === "function" ? target.bold.bind(target) : (s: string) => `\x1b[1m${s}\x1b[22m`;
 	target.bold = function (text: string) {
@@ -135,13 +135,13 @@ export function cursorStyle(theme: Theme, text: string): string {
 }
 
 /**
- * Shared Cinlodev CUTE palette bound to theme keys.
+ * Shared Workspace palette bound to theme keys.
  * Single source of truth for footer + todos so neither file
- * duplicates hardcoded ANSI. Hexes match themes/CinlodevCute.json:
+ * duplicates hardcoded ANSI. Hexes match themes/Workspace.json:
  * border #8e44ad, pinkBright #FFB1DD, accent #F095C8,
  * heading #E0C27A, warning #F2B86D, text #F6EFF3,
  * muted #A78E9B, dim #76616B, green #B4E7C7, cursorText #1A1218.
-export interface CutePalette {
+export interface SolviPalette {
 	border(text: string): string;
 	pinkBright(text: string): string;
 	pinkAccent(text: string): string;
@@ -156,8 +156,8 @@ export interface CutePalette {
 }
 
 /** Frame style presets for configurable glyphs. Double is the current visual. */
-export type CuteFrameStyle = "double" | "single" | "rounded" | "ascii";
-export function cutePalette(theme: Theme): CutePalette {
+export type SolviFrameStyle = "double" | "single" | "rounded" | "ascii";
+export function solviPalette(theme: Theme): SolviPalette {
 	return {
 		border: (s) => frameFg(theme, s),
 		pinkBright: (s) => safeFg(theme, "pinkBright", s),

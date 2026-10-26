@@ -1,6 +1,6 @@
 import type { Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg, stripAnsi } from "../cute-theme.ts";
+import { safeFg, stripAnsi } from "../solvi-theme.ts";
 import { unwrapNativeCard } from "./transcript-unwrap.ts";
 
 /**
@@ -42,7 +42,7 @@ export function toolFilePath(child: Component, renderedLines?: string[]): string
 			return p.replace(/:\d+(?:-\d+)?$/, "");
 		}
 	}
-	// Fallback: extract path from rendered header lines, e.g. "edit src/cute-theme.ts" or "read foo.ts:1-10"
+	// Fallback: extract path from rendered header lines, e.g. "edit src/solvi-theme.ts" or "read foo.ts:1-10"
 	const lines = renderedLines ?? tryRender(child, 80);
 	if (lines && lines.length > 0) {
 		const unwrapped = unwrapNativeCard(lines);
@@ -76,7 +76,7 @@ const CODE_TOKEN =
 	"|\\b([A-Z][\\w$]*)\\b";
 
 /**
- * Dracula-style single-line code highlighter bound to the active CUTE theme's
+ * Dracula-style single-line code highlighter bound to the active SOLVI theme's
  * `syntax*` roles (keyword pink, string green, function light-blue, number
  * orange, type gold, comment muted) so edit diffs match the native `read`
  * highlighting.

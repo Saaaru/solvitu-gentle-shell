@@ -1,9 +1,9 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { cuteGlyphs, cutePalette, safeFg } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { loadCutePaths } from "../cute-paths.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
+import { solviGlyphs, solviPalette, safeFg } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { loadSolviPaths } from "../solvi-paths.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
 import {
 	DEFAULT_ENGRAM_DASHBOARD,
 	detectProjectName,
@@ -33,11 +33,11 @@ export function getLastRenderedSnapshot(): EngramSnapshot | null {
 }
 
 /**
- * CinlodevEngramCard: Interactive TUI sidebar card showing local Engram daemon health,
+ * WorkspaceEngramCard: Interactive TUI sidebar card showing local Engram daemon health,
  * observations count, and Cloud sync status with direct click-to-open dashboard
  * and enroll/unenroll actions.
  */
-export class CinlodevEngramCard implements Component {
+export class WorkspaceEngramCard implements Component {
 	private readonly ctx: ExtensionContext;
 	private readonly tui: TUI;
 	private readonly theme?: Theme;
@@ -127,14 +127,14 @@ export class CinlodevEngramCard implements Component {
 		const cwd = this.ctx.cwd ?? process.cwd();
 		triggerEngramRefresh(cwd, this.tui);
 
-		const g = cuteGlyphs(this.theme);
-		const colors = loadCuteColors();
+		const g = solviGlyphs(this.theme);
+		const colors = loadSolviColors();
 		const theme = this.theme;
 		const safeWidth = Math.max(30, width);
-		const innerWidth = safeWidth - 4; // ║ + space + content + space + ║
+		const innerWidth = safeWidth - 4; // │ + space + content + space + │
 
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);
-		const palette = cutePalette(this.theme);
+		const palette = solviPalette(this.theme);
 
 		const c = {
 			...palette,
@@ -206,7 +206,7 @@ export class CinlodevEngramCard implements Component {
 		lines.push(frame(`${g.dividerL}${g.h.repeat(safeWidth - 2)}${g.dividerR}`));
 
 		// Section 3: Cloud & Dashboard
-		const configuredDashboard = loadCutePaths().engramDashboardUrl;
+		const configuredDashboard = loadSolviPaths().engramDashboardUrl;
 		const cloudServerUrl = snapshot?.cloudConfig?.serverUrl || configuredDashboard || DEFAULT_ENGRAM_DASHBOARD;
 		let serverHost = "local";
 		try {
@@ -221,7 +221,7 @@ export class CinlodevEngramCard implements Component {
 			lineIndex: lines.length,
 			action: async () => {
 				this.resetConfirmation();
-				const configuredDashboard = loadCutePaths().engramDashboardUrl;
+				const configuredDashboard = loadSolviPaths().engramDashboardUrl;
 				const targetUrl = resolveDashboardUrl(snapshot?.cloudConfig, projectName, configuredDashboard);
 				const opened = await openEngramDashboard(targetUrl);
 				if (opened) {

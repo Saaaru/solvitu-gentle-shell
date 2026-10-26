@@ -1,9 +1,9 @@
 import { ScrollView, type Component, type TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { cuteGlyphs, safeFg, transformTranscriptLines } from "./cute-theme.ts";
-import { formatTranscriptChildren } from "./cute-transcript.ts";
-import { loadCuteLayout, resolveEdgeInsets, tuneTuiScroll } from "./cute-layout.ts";
-import { CinlodevProfilesExtendedCard } from "./cute-profiles.ts";
+import { solviGlyphs, safeFg, transformTranscriptLines } from "./solvi-theme.ts";
+import { formatTranscriptChildren } from "./solvi-transcript.ts";
+import { loadSolviLayout, resolveEdgeInsets, tuneTuiScroll } from "./solvi-layout.ts";
+import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
 import {
 	findDock,
 	findTranscript,
@@ -23,11 +23,11 @@ import {
 	buildSidebarRailLines,
 } from "./sidebar-rail-builder.ts";
 import {
-	CUTE_SIDEBAR_TABS,
+	SOLVI_SIDEBAR_TABS,
 	SIDEBAR_TAB_CARD_MAP,
 	resolveSidebarTab,
-	renderCuteSidebarTabBar,
-	type CuteSidebarTab,
+	renderSolviSidebarTabBar,
+	type SolviSidebarTab,
 	type TabHitbox,
 } from "./sidebar-tabs.ts";
 
@@ -36,11 +36,11 @@ export {
 	sidebarPart,
 	SIDEBAR_STATE_KEY,
 	type SidebarState,
-	CUTE_SIDEBAR_TABS,
+	SOLVI_SIDEBAR_TABS,
 	SIDEBAR_TAB_CARD_MAP,
 	resolveSidebarTab,
-	renderCuteSidebarTabBar,
-	type CuteSidebarTab,
+	renderSolviSidebarTabBar,
+	type SolviSidebarTab,
 	type TabHitbox,
 };
 
@@ -54,7 +54,7 @@ interface LayoutRoot extends Component {
 }
 
 // Marker symbol to avoid double-wrapping layoutRoot
-export const CUTE_LAYOUT_WRAPPER = Symbol.for("pi-cinlodev-cute.layout-wrapper");
+export const SOLVI_LAYOUT_WRAPPER = Symbol.for("solvitu.layout-wrapper");
 
 export function installSidebar(tui: TUI, theme?: Theme): () => void {
 	if (!tui.terminal) return () => {};
@@ -65,23 +65,23 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 	const subtle = (s: string): string => (theme ? safeFg(theme, "borderMuted", s) : s);
 	const pink = (s: string): string => (theme ? safeFg(theme, "accent", s) : s);
 	const pinkBright = (s: string): string => (theme ? safeFg(theme, "pinkBright", s) : s);
-	const railV = cuteGlyphs(theme).v;
+	const railV = solviGlyphs(theme).v;
 	const state = sidebarState(tui);
-	if (!state.parts.has("cute-profiles")) {
-		const profilesCard = new CinlodevProfilesExtendedCard(tui, theme);
-		state.parts.set("cute-profiles", profilesCard);
+	if (!state.parts.has("solvi-profiles")) {
+		const profilesCard = new WorkspaceProfilesExtendedCard(tui, theme);
+		state.parts.set("solvi-profiles", profilesCard);
 	}
 	const cleanups: Array<() => void> = [];
 
 	// Interceptar terminal.write para sellar la columna de scrollbar en filas con Kitty/iTerm2 Graphics:
 	// @earendil-works/pi-tui saltea replaceScrollbarCell cuando isImageLine es true, dejando un espacio
 	// no pintado al final de la fila. Aquí restauramos el glifo de riel exactamente en la columna del scrollbar
-	// (la celda inmediatamente posterior al borde de la tarjeta [║│] y padding del rail), evitando que se
+	// (la celda inmediatamente posterior al borde de la tarjeta [││] y padding del rail), evitando que se
 	// desplace hacia espacios de margen/afterPad a la derecha.
 	if (typeof tui.terminal?.write === "function") {
 		const origTerminalWrite = tui.terminal.write.bind(tui.terminal);
 		const kittyScrollbarSealRegex =
-			/((?:\x1b_G|\x1b\]1337;File=)(?:(?!\x1b\[\d+;\d+H)[\s\S])*?[║│](?:\x1b\[[0-9;]*m)?\s*(?:\x1b\[[0-9;]*m|\x1b\]8;;(?:\x1b\\|\x07))*) (?=(?:\x1b\[\d+;\d+H|\s*|$))/g;
+			/((?:\x1b_G|\x1b\]1337;File=)(?:(?!\x1b\[\d+;\d+H)[\s\S])*?[││](?:\x1b\[[0-9;]*m)?\s*(?:\x1b\[[0-9;]*m|\x1b\]8;;(?:\x1b\\|\x07))*) (?=(?:\x1b\[\d+;\d+H|\s*|$))/g;
 		tui.terminal.write = (data: string) => {
 			if (typeof data === "string" && (data.includes("\x1b_G") || data.includes("\x1b]1337;File="))) {
 				const repaired = data.replace(kittyScrollbarSealRegex, `$1${pink(railV)}`);
@@ -114,7 +114,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 
 	const leftBorder: Component = {
 		render(width: number) {
-			const rows = Math.max(1, tui.terminal?.rows ?? loadCuteLayout().sidebar.fallbackRows);
+			const rows = Math.max(1, tui.terminal?.rows ?? loadSolviLayout().sidebar.fallbackRows);
 			const line =
 				width >= 2
 					? `${subtle(railV)}${" ".repeat(width - 1)}`
@@ -147,7 +147,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 
 	const prepare = (width: number): boolean => {
 		state.active = false;
-		const layout = loadCuteLayout().sidebar;
+		const layout = loadSolviLayout().sidebar;
 		if (stopped || failed || host.mode !== "fullscreen" || width < layout.breakpoint) return false;
 		try {
 			const contentWidth = scroll.getContentWidth(layout.railWidth);
@@ -192,7 +192,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 			}
 			activeTranscript = findTranscript(root);
 			activeDock = findDock(root);
-			if (typeof root[NODE] === "function" && (root[NODE] as any)[CUTE_LAYOUT_WRAPPER]) {
+			if (typeof root[NODE] === "function" && (root[NODE] as any)[SOLVI_LAYOUT_WRAPPER]) {
 				return;
 			}
 
@@ -205,8 +205,8 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 			const originalScrollbarThumbStyle = transcript ? (transcript as any).scrollbarThumbStyle : undefined;
 
 			const originalTranscriptRender = transcript ? transcript.render.bind(transcript) : undefined;
-			if (transcript && !(transcript as any).__cuteWrapped) {
-				(transcript as any).__cuteWrapped = true;
+			if (transcript && !(transcript as any).__solviWrapped) {
+				(transcript as any).__solviWrapped = true;
 				const orig = transcript.render.bind(transcript);
 				transcript.render = (width: number) => {
 					const rawLines = orig(width);
@@ -216,8 +216,8 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 
 			const doc = (transcript as any)?.child as Component | undefined;
 			const originalDocRender = doc ? doc.render.bind(doc) : undefined;
-			if (doc && !(doc as any).__cuteDocWrapped) {
-				(doc as any).__cuteDocWrapped = true;
+			if (doc && !(doc as any).__solviDocWrapped) {
+				(doc as any).__solviDocWrapped = true;
 				const origDoc = doc.render.bind(doc);
 				doc.render = (width: number) => {
 					const rawLines = origDoc(width);
@@ -231,8 +231,8 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 					Array.isArray(c?.children) && c !== (doc as any)?.children?.[0] && c !== (doc as any)?.children?.[1],
 				) ?? (doc as any)?.children?.[2];
 			const originalChatRender = chatContainer ? chatContainer.render.bind(chatContainer) : undefined;
-			if (chatContainer && !(chatContainer as any).__cuteChatWrapped && Array.isArray(chatContainer.children)) {
-				(chatContainer as any).__cuteChatWrapped = true;
+			if (chatContainer && !(chatContainer as any).__solviChatWrapped && Array.isArray(chatContainer.children)) {
+				(chatContainer as any).__solviChatWrapped = true;
 				chatContainer.render = (width: number) => {
 					const { lines, mouseChildren } = formatTranscriptChildren(chatContainer.children, width, theme);
 					chatContainer.mouseLayout = { width, children: mouseChildren };
@@ -243,8 +243,8 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 			const dock = findDock(root);
 			const widgetsAbove = dock?.entries?.[2]?.component as Component | undefined;
 			const originalWidgetsAboveRender = widgetsAbove ? widgetsAbove.render.bind(widgetsAbove) : undefined;
-			if (widgetsAbove && !(widgetsAbove as any).__cuteWidgetsWrapped) {
-				(widgetsAbove as any).__cuteWidgetsWrapped = true;
+			if (widgetsAbove && !(widgetsAbove as any).__solviWidgetsWrapped) {
+				(widgetsAbove as any).__solviWidgetsWrapped = true;
 				const origWidgets = widgetsAbove.render.bind(widgetsAbove);
 				widgetsAbove.render = (width: number) => {
 					const rawLines = origWidgets(width);
@@ -254,8 +254,8 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 
 			const widgetsBelow = dock?.entries?.[4]?.component as Component | undefined;
 			const originalWidgetsBelowRender = widgetsBelow ? widgetsBelow.render.bind(widgetsBelow) : undefined;
-			if (widgetsBelow && !(widgetsBelow as any).__cuteWidgetsWrapped) {
-				(widgetsBelow as any).__cuteWidgetsWrapped = true;
+			if (widgetsBelow && !(widgetsBelow as any).__solviWidgetsWrapped) {
+				(widgetsBelow as any).__solviWidgetsWrapped = true;
 				const origWidgets = widgetsBelow.render.bind(widgetsBelow);
 				widgetsBelow.render = (width: number) => {
 					const rawLines = origWidgets(width);
@@ -263,7 +263,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 				};
 			}
 
-			const applyCuteScrollbars = () => {
+			const applySolviScrollbars = () => {
 				if (!transcript) return;
 				(transcript as any).scrollbarTrackStyle = () => subtle(railV);
 				(transcript as any).scrollbarThumbStyle = (text: string) =>
@@ -274,22 +274,22 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 			const restoreTranscript = () => {
 				if (!transcript) return;
 				if (originalTranscriptRender) transcript.render = originalTranscriptRender;
-				delete (transcript as any).__cuteWrapped;
-				if (doc && (doc as any).__cuteDocWrapped) {
+				delete (transcript as any).__solviWrapped;
+				if (doc && (doc as any).__solviDocWrapped) {
 					if (originalDocRender) doc.render = originalDocRender;
-					delete (doc as any).__cuteDocWrapped;
+					delete (doc as any).__solviDocWrapped;
 				}
-				if (chatContainer && (chatContainer as any).__cuteChatWrapped) {
+				if (chatContainer && (chatContainer as any).__solviChatWrapped) {
 					if (originalChatRender) chatContainer.render = originalChatRender;
-					delete (chatContainer as any).__cuteChatWrapped;
+					delete (chatContainer as any).__solviChatWrapped;
 				}
-				if (widgetsAbove && (widgetsAbove as any).__cuteWidgetsWrapped) {
+				if (widgetsAbove && (widgetsAbove as any).__solviWidgetsWrapped) {
 					if (originalWidgetsAboveRender) widgetsAbove.render = originalWidgetsAboveRender;
-					delete (widgetsAbove as any).__cuteWidgetsWrapped;
+					delete (widgetsAbove as any).__solviWidgetsWrapped;
 				}
-				if (widgetsBelow && (widgetsBelow as any).__cuteWidgetsWrapped) {
+				if (widgetsBelow && (widgetsBelow as any).__solviWidgetsWrapped) {
 					if (originalWidgetsBelowRender) widgetsBelow.render = originalWidgetsBelowRender;
-					delete (widgetsBelow as any).__cuteWidgetsWrapped;
+					delete (widgetsBelow as any).__solviWidgetsWrapped;
 				}
 				if (originalScrollbarTrackStyle) (transcript as any).scrollbarTrackStyle = originalScrollbarTrackStyle;
 				if (originalScrollbarThumbStyle) (transcript as any).scrollbarThumbStyle = originalScrollbarThumbStyle;
@@ -298,7 +298,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 
 			const middleDivider: Component = {
 				render(width: number) {
-					const rows = Math.max(1, tui.terminal?.rows ?? loadCuteLayout().sidebar.fallbackRows);
+					const rows = Math.max(1, tui.terminal?.rows ?? loadSolviLayout().sidebar.fallbackRows);
 					const line =
 						width >= 2
 							? `${" ".repeat(width - 1)}${subtle(railV)}`
@@ -317,12 +317,12 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 				[NODE]: () => original.call(root),
 			};
 			const replacement = () => {
-				const cute = loadCuteLayout();
-				const layout = cute.sidebar;
+				const solvi = loadSolviLayout();
+				const layout = solvi.sidebar;
 				const columns = tui.terminal.columns;
 				// Edge columns eaten by overlay chrome that never resizes the pty
 				// (Herdr's bar) stay empty so borders are never clipped.
-				const { left: insetLeft, right: insetRight } = resolveEdgeInsets(cute.terminal);
+				const { left: insetLeft, right: insetRight } = resolveEdgeInsets(solvi.terminal);
 				const availColumns = Math.max(1, columns - insetLeft - insetRight);
 				const active = prepare(availColumns);
 				const hasLeftBorder = availColumns >= layout.minColumnsWithBorder;
@@ -334,7 +334,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 					}
 				} else {
 					// Si el sidebar no cabe, restauramos el scrollbar original pero mantenemos
-					// intactos los wrappers CUTE del transcript y de las cards
+					// intactos los wrappers SOLVI del transcript y de las cards
 					if (transcript && transcript.scrollbar !== originalScrollbar) {
 						transcript.setScrollbar(originalScrollbar);
 					}
@@ -367,7 +367,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 				}
 
 				if (active) {
-					applyCuteScrollbars();
+					applySolviScrollbars();
 				}
 
 				const edgeSpacer = (): Component => ({
@@ -427,7 +427,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 					});
 				}
 
-				const cuteHstack: any = {
+				const solviHstack: any = {
 					type: "hstack",
 					gap: layout.gap,
 					align: "stretch",
@@ -443,7 +443,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 								component: {
 									render: () => [],
 									invalidate() {},
-									[NODE]: () => cuteHstack,
+									[NODE]: () => solviHstack,
 								},
 								basis: 0,
 								grow: 1,
@@ -454,10 +454,10 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 					};
 				}
 
-				return cuteHstack;
+				return solviHstack;
 			};
 
-			(replacement as any)[CUTE_LAYOUT_WRAPPER] = true;
+			(replacement as any)[SOLVI_LAYOUT_WRAPPER] = true;
 			root[NODE] = replacement;
 			roots.add(root);
 			tui.requestRender();
@@ -484,7 +484,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 			if (stopped) return;
 			attach();
 			const isAttached = !!host.layoutRoot && roots.has(host.layoutRoot);
-			const nextDelay = isAttached ? 400 : loadCuteLayout().sidebar.attachMs;
+			const nextDelay = isAttached ? 400 : loadSolviLayout().sidebar.attachMs;
 			scheduleNext(nextDelay);
 		}, delayMs);
 		currentTimer.unref();
@@ -492,7 +492,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 
 	attach();
 	const isAlreadyAttached = !!host.layoutRoot && roots.has(host.layoutRoot);
-	scheduleNext(isAlreadyAttached ? 400 : loadCuteLayout().sidebar.attachMs);
+	scheduleNext(isAlreadyAttached ? 400 : loadSolviLayout().sidebar.attachMs);
 
 	return () => {
 		stopped = true;

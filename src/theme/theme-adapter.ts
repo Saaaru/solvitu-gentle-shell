@@ -1,14 +1,14 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { loadCuteColors } from "../cute-colors.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
 import { safeFg, bolden, stripAnsi } from "./theme-color.ts";
-import { cuteGlyphs } from "./theme-glyphs.ts";
+import { solviGlyphs } from "./theme-glyphs.ts";
 
 // Sidebar cards (Changes, Agents, Todo) remain uniformly colored in the theme's border
 // tone (no green override on diff additions or status).
 export function unifySidebarCardFrame(raw: string, theme?: Theme): string {
 	if (!theme) return raw;
-	const g = cuteGlyphs(theme);
-	const colors = loadCuteColors();
+	const g = solviGlyphs(theme);
+	const colors = loadSolviColors();
 	const toConfigured: Record<string, string> = {
 		"╭": g.tl,
 		"╮": g.tr,
@@ -18,11 +18,18 @@ export function unifySidebarCardFrame(raw: string, theme?: Theme): string {
 		"─": g.h,
 	};
 
-	let line = raw;
-	// Replace ANSI-colored frame tokens with configured double-line glyphs in border tone
-	line = line.replace(
-		/\x1b\[[0-9;]*m[ ╭╮╰╯│─]*[╭╮╰╯│─][ ╭╮╰╯│─]*(?:\x1b\[39m|\x1b\[0m)?/g,
+	// One pass over the ORIGINAL string: either an ANSI-colored run of frame glyphs, or one
+	// bare (unstyled) frame glyph. Scanning in two separate passes (ANSI runs, then "remaining
+	// bare glyphs") used to re-match characters the first pass already emitted — "─" maps to
+	// itself (g.h is "─" too), so it survived pass one unescaped and pass two wrapped it a
+	// second time, nesting the color codes and splitting "┌─" apart for any caller checking
+	// adjacency.
+	return raw.replace(
+		/\x1b\[[0-9;]*m[ ╭╮╰╯│─]*[╭╮╰╯│─][ ╭╮╰╯│─]*(?:\x1b\[39m|\x1b\[0m)?|[╭╮╰╯│─]/g,
 		(token) => {
+			if (token.length === 1) {
+				return safeFg(theme, colors.sidebarBorder, toConfigured[token] ?? token);
+			}
 			const open = token.match(/^\x1b\[[0-9;]*m/)?.[0] ?? "";
 			const close = token.match(/(?:\x1b\[39m|\x1b\[0m)$/)?.[0] ?? "";
 			const glyphs = token.slice(open.length, close ? token.length - close.length : undefined);
@@ -30,22 +37,17 @@ export function unifySidebarCardFrame(raw: string, theme?: Theme): string {
 			return safeFg(theme, colors.sidebarBorder, doubled);
 		},
 	);
-
-	// Replace remaining bare frame glyphs
-	line = line.replace(/[╭╮╰╯│─]/g, (c) => safeFg(theme, colors.sidebarBorder, toConfigured[c] ?? c));
-
-	return line;
 }
 
-export type CuteCardTone = "success" | "warning" | "error" | "border";
+export type SolviCardTone = "success" | "warning" | "error" | "border";
 
 // Gentle AI card lines in transcript & dock: double-line frame, appropriate tone
 // (warning = yellow #F2B86D, success = green #78A588, error = coral #FF718F),
 // and robot glyph 🤖 replacing rose, tulip, or flower.
-export function formatGentleAiCardLine(raw: string, theme?: Theme, tone: CuteCardTone = "success"): string {
+export function formatGentleAiCardLine(raw: string, theme?: Theme, tone: SolviCardTone = "success"): string {
 	if (!theme) return raw;
-	const g = cuteGlyphs(theme);
-	const colors = loadCuteColors();
+	const g = solviGlyphs(theme);
+	const colors = loadSolviColors();
 	const resolvedTone =
 		tone === "warning"
 			? colors.gentleCardWarning
@@ -74,7 +76,7 @@ export function formatGentleAiCardLine(raw: string, theme?: Theme, tone: CuteCar
 
 	// 3. Reemplazar tokens ANSI de marco y pintarlos con el tono correspondiente
 	line = line.replace(
-		/\x1b\[[0-9;]*m[ ╭╮╰╯│─╔╗╚╝║═]*[╭╮╰╯│─╔╗╚╝║═][ ╭╮╰╯│─╔╗╚╝║═]*(?:\x1b\[39m|\x1b\[0m)?/g,
+		/\x1b\[[0-9;]*m[ ╭╮╰╯│─┌┐└┘│─]*[╭╮╰╯│─┌┐└┘│─][ ╭╮╰╯│─┌┐└┘│─]*(?:\x1b\[39m|\x1b\[0m)?/g,
 		(token) => {
 			const open = token.match(/^\x1b\[[0-9;]*m/)?.[0] ?? "";
 			const close = token.match(/(?:\x1b\[39m|\x1b\[0m)$/)?.[0] ?? "";
@@ -90,7 +92,7 @@ export function formatGentleAiCardLine(raw: string, theme?: Theme, tone: CuteCar
 	// 5. Si reemplazamos ✿ (1 columna) por 🤖 (2 columnas), el título creció 1 columna:
 	// acortamos la regla horizontal por 1 columna para que el marco cierre perfectamente simétrico.
 	if (hadSingleColFlower) {
-		line = line.replace(/═{3,}/, (r) => r.slice(1));
+		line = line.replace(/─{3,}/, (r) => r.slice(1));
 	}
 
 	return line;
@@ -102,14 +104,14 @@ export function formatGentleAiCardLine(raw: string, theme?: Theme, tone: CuteCar
 export function transformTranscriptLines(rawLines: string[], theme?: Theme): string[] {
 	if (!theme || !rawLines.length) return rawLines;
 	let inGentleCard = false;
-	let currentTone: CuteCardTone = "success";
+	let currentTone: SolviCardTone = "success";
 	let inFence = false;
 
 	return rawLines.map((line) => {
 		const plain = stripAnsi(line);
 		const hasGentleTitle = plain.includes("Gentle AI");
-		const isTopRule = (plain.includes("╭") || plain.includes("╔")) && hasGentleTitle;
-		const isBottomRule = plain.includes("╰") || plain.includes("╚") || plain.includes("╯") || plain.includes("╝");
+		const isTopRule = (plain.includes("╭") || plain.includes("┌")) && hasGentleTitle;
+		const isBottomRule = plain.includes("╰") || plain.includes("└") || plain.includes("╯") || plain.includes("┘");
 
 		if (/^\s*```/.test(plain)) inFence = !inFence;
 
@@ -154,7 +156,7 @@ export function unifyCardFrame(raw: string, theme?: Theme): string {
 	if (!theme) return raw;
 	const plain = stripAnsi(raw);
 	if (plain.includes("Gentle AI") || plain.includes("🤖") || /[\u{1F339}\uFE0E\u{1F339}🌹\u{1F337}🌷]/.test(raw)) {
-		let tone: CuteCardTone = "success";
+		let tone: SolviCardTone = "success";
 		if (
 			plain.includes("dev binary override") ||
 			plain.includes("field-test only") ||

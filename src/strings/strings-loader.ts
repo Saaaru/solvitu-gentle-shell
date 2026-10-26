@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type CuteStrings, type CutePersonaMode, PERSONA_PRESETS, CUTE_STRINGS_FILENAME, DEFAULTS } from "./strings-types.ts";
+import { type SolviStrings, type SolviPersonaMode, PERSONA_PRESETS, SOLVI_STRINGS_FILENAME, DEFAULTS } from "./strings-types.ts";
 import { detectSystemUser, resetDetectedUser } from "./strings-user.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -14,8 +14,8 @@ function pickString(source: unknown, fallback: string): string {
 }
 
 /** Merge a parsed JSON value over the defaults; unknown keys are ignored. */
-function mergeStrings(raw: unknown, baseSource: CuteStrings = DEFAULTS): CuteStrings {
-	const base: CuteStrings = {
+function mergeStrings(raw: unknown, baseSource: SolviStrings = DEFAULTS): SolviStrings {
+	const base: SolviStrings = {
 		...baseSource,
 		hudDescriptions: { ...baseSource.hudDescriptions },
 		notifys: { ...baseSource.notifys },
@@ -33,7 +33,7 @@ function mergeStrings(raw: unknown, baseSource: CuteStrings = DEFAULTS): CuteStr
 		typeof raw.personaMode === "string" ? raw.personaMode.toLowerCase() : undefined
 	);
 	if (personaKey === "gentlewoman" || personaKey === "gentleman") {
-		const preset = PERSONA_PRESETS[personaKey as CutePersonaMode];
+		const preset = PERSONA_PRESETS[personaKey as SolviPersonaMode];
 		base.welcomePersona.name = preset.name;
 		base.welcomePersona.userRole = preset.userRole;
 		base.welcomePersona.userPronoun = preset.userPronoun;
@@ -84,25 +84,25 @@ function mergeStrings(raw: unknown, baseSource: CuteStrings = DEFAULTS): CuteStr
 	}
 	if (isRecord(raw.notifys)) {
 		const target = base.notifys;
-		for (const key of Object.keys(DEFAULTS.notifys) as (keyof CuteStrings["notifys"])[]) {
+		for (const key of Object.keys(DEFAULTS.notifys) as (keyof SolviStrings["notifys"])[]) {
 			target[key] = pickString(raw.notifys[key], target[key]);
 		}
 	}
 	if (isRecord(raw.hudStatusLine)) {
 		const target = base.hudStatusLine;
-		for (const key of Object.keys(DEFAULTS.hudStatusLine) as (keyof CuteStrings["hudStatusLine"])[]) {
+		for (const key of Object.keys(DEFAULTS.hudStatusLine) as (keyof SolviStrings["hudStatusLine"])[]) {
 			target[key] = pickString(raw.hudStatusLine[key], target[key]);
 		}
 	}
 	if (isRecord(raw.sidebarBanner)) {
 		const target = base.sidebarBanner;
-		for (const key of Object.keys(DEFAULTS.sidebarBanner) as (keyof CuteStrings["sidebarBanner"])[]) {
+		for (const key of Object.keys(DEFAULTS.sidebarBanner) as (keyof SolviStrings["sidebarBanner"])[]) {
 			target[key] = pickString(raw.sidebarBanner[key], target[key]);
 		}
 	}
 	if (isRecord(raw.todos)) {
 		const target = base.todos;
-		for (const key of Object.keys(DEFAULTS.todos) as (keyof CuteStrings["todos"])[]) {
+		for (const key of Object.keys(DEFAULTS.todos) as (keyof SolviStrings["todos"])[]) {
 			target[key] = pickString(raw.todos[key], target[key]);
 		}
 	}
@@ -136,13 +136,13 @@ function mergeStrings(raw: unknown, baseSource: CuteStrings = DEFAULTS): CuteStr
 	base.editorHint = pickString(raw.editorHint, base.editorHint);
 	if (isRecord(raw.welcomeTitles)) {
 		const target = base.welcomeTitles;
-		for (const key of Object.keys(DEFAULTS.welcomeTitles) as (keyof CuteStrings["welcomeTitles"])[]) {
+		for (const key of Object.keys(DEFAULTS.welcomeTitles) as (keyof SolviStrings["welcomeTitles"])[]) {
 			target[key] = pickString(raw.welcomeTitles[key], target[key]);
 		}
 	}
 	if (isRecord(raw.welcomeHotkeys)) {
 		const target = base.welcomeHotkeys;
-		for (const key of Object.keys(DEFAULTS.welcomeHotkeys) as (keyof CuteStrings["welcomeHotkeys"])[]) {
+		for (const key of Object.keys(DEFAULTS.welcomeHotkeys) as (keyof SolviStrings["welcomeHotkeys"])[]) {
 			target[key] = pickString(raw.welcomeHotkeys[key], target[key]);
 		}
 	}
@@ -154,12 +154,12 @@ function mergeStrings(raw: unknown, baseSource: CuteStrings = DEFAULTS): CuteStr
 
 // Tunables live in config/, NOT in themes/: Pi treats every *.json under
 // themes/ as a theme file and rejects ours. Legacy themes/ fallback kept.
-// User overrides in ~/.pi/agent/cute.json or ~/.pi/agent/cute/CinlodevCute.strings.json
+// User overrides in ~/.pi/agent/solvi.json or ~/.pi/agent/solvi/Workspace.strings.json
 // layer on top of package defaults and persist across package updates.
 function isPackageClone(dir: string): boolean {
 	try {
 		const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
-		return pkg?.name === "pi-cinlodev-cute";
+		return pkg?.name === "solvitu";
 	} catch {
 		return false;
 	}
@@ -181,21 +181,28 @@ function candidateStringsFiles(): string[] {
 	try {
 		const here = path.dirname(fileURLToPath(import.meta.url));
 		const packageDir = path.resolve(here, "../..");
-		add(path.join(packageDir, "config", CUTE_STRINGS_FILENAME));
-		add(path.join(packageDir, "themes", CUTE_STRINGS_FILENAME));
+		add(path.join(packageDir, "config", SOLVI_STRINGS_FILENAME));
+		add(path.join(packageDir, "themes", SOLVI_STRINGS_FILENAME));
 	} catch {}
 
-	// 2. User-level global overrides (~/.pi/agent, outside git, persistent across package updates)
+	// 2. User-level global overrides (~/.pi/agent, outside git, persistent across package
+	// updates). Keeps every naming generation this package has used (cute.* from
+	// pi-cinlodev-cute, workspace.json from the Workspace rename, solvi.* going forward).
 	try {
 		const agentDir = process.env.PI_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
+		add(path.join(agentDir, "solvi.json"));
+		add(path.join(agentDir, ".solvi.json"));
+		add(path.join(agentDir, "solvi.local.json"));
+		add(path.join(agentDir, "workspace.json"));
 		add(path.join(agentDir, "cute.json"));
 		add(path.join(agentDir, ".cute.json"));
 		add(path.join(agentDir, "cute.local.json"));
-		add(path.join(agentDir, "cinlodev-cute.json"));
-		add(path.join(agentDir, "cute", CUTE_STRINGS_FILENAME));
+		add(path.join(agentDir, "solvi", SOLVI_STRINGS_FILENAME));
+		add(path.join(agentDir, "solvi", "strings.json"));
+		add(path.join(agentDir, "solvi", "solvi.local.json"));
+		add(path.join(agentDir, "cute", SOLVI_STRINGS_FILENAME));
 		add(path.join(agentDir, "cute", "strings.json"));
-		add(path.join(agentDir, "cute", "cute.local.json"));
-		add(path.join(agentDir, "cinlodev-cute", CUTE_STRINGS_FILENAME));
+		add(path.join(agentDir, "cinlodev-cute", SOLVI_STRINGS_FILENAME));
 		add(path.join(agentDir, "cinlodev-cute", "strings.json"));
 	} catch {}
 
@@ -206,26 +213,32 @@ function candidateStringsFiles(): string[] {
 		const cwd = path.resolve(process.cwd());
 
 		// Local untracked overrides (supported everywhere, even in package clone)
+		add(path.join(cwd, "solvi.local.json"));
+		add(path.join(cwd, ".solvi.json"));
 		add(path.join(cwd, "cute.local.json"));
 		add(path.join(cwd, ".cute.json"));
+		add(path.join(cwd, "config", "solvi.local.json"));
+		add(path.join(cwd, "config", ".solvi.json"));
 		add(path.join(cwd, "config", "cute.local.json"));
 		add(path.join(cwd, "config", ".cute.json"));
 
 		if (cwd !== packageDir && !isPackageClone(cwd)) {
+			add(path.join(cwd, "solvi.json"));
+			add(path.join(cwd, ".pi", "solvi.json"));
+			add(path.join(cwd, ".pi", "workspace.json"));
 			add(path.join(cwd, "cute.json"));
 			add(path.join(cwd, ".pi", "cute.json"));
-			add(path.join(cwd, ".pi", "cinlodev-cute.json"));
 		}
 	} catch {}
 
 	return candidates;
 }
 
-let cached: CuteStrings | null = null;
+let cached: SolviStrings | null = null;
 
-export function loadCuteStrings(): CuteStrings {
+export function loadSolviStrings(): SolviStrings {
 	if (cached) return cached;
-	let current: CuteStrings = mergeStrings(undefined, DEFAULTS);
+	let current: SolviStrings = mergeStrings(undefined, DEFAULTS);
 	for (const file of candidateStringsFiles()) {
 		try {
 			if (!fs.existsSync(file)) continue;
@@ -247,7 +260,7 @@ export function loadCuteStrings(): CuteStrings {
 }
 
 /** Clear the in-memory cache (tests and follow-up slices). */
-export function resetCuteStringsCache(): void {
+export function resetSolviStringsCache(): void {
 	cached = null;
 	resetDetectedUser();
 }

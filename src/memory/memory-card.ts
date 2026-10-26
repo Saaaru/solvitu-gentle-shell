@@ -1,10 +1,10 @@
 import path from "node:path";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { cuteGlyphs, cutePalette, safeFg, bolden } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
-import { notify } from "../cute-notify.ts";
+import { solviGlyphs, solviPalette, safeFg, bolden } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
+import { notify } from "../solvi-notify.ts";
 import {
 	type PersistentMemoryStats,
 	DEFAULT_PERSISTENT_MEMORY_URL,
@@ -24,7 +24,7 @@ interface ActionTarget {
 let cachedStats: { [key: string]: { stats: PersistentMemoryStats; expiresAt: number } } = {};
 const CACHE_TTL_MS = 5000;
 
-export class CinlodevPersistentMemoryCard implements Component {
+export class WorkspacePersistentMemoryCard implements Component {
 	private readonly ctx?: ExtensionContext;
 	private readonly tui?: TUI;
 	private readonly theme?: Theme;
@@ -39,7 +39,7 @@ export class CinlodevPersistentMemoryCard implements Component {
 		this.ctx = ctx;
 		this.tui = tui;
 		this.theme = theme;
-		this.pi = pi || (tui as any)?.__cutePi;
+		this.pi = pi || (tui as any)?.__solviPi;
 		this.cwd = cwd || ctx?.cwd || process.cwd();
 	}
 
@@ -119,14 +119,14 @@ export class CinlodevPersistentMemoryCard implements Component {
 
 	render(width: number): string[] {
 		this.clickTargets = [];
-		const g = cuteGlyphs(this.theme);
-		const colors = loadCuteColors();
+		const g = solviGlyphs(this.theme);
+		const colors = loadSolviColors();
 		const theme = this.theme;
 		const safeWidth = Math.max(30, width);
 		const innerWidth = safeWidth - 4;
 
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);
-		const palette = cutePalette(this.theme);
+		const palette = solviPalette(this.theme);
 		const c = {
 			...palette,
 			pink: (s: string): string => palette.pinkAccent(s),
@@ -153,7 +153,7 @@ export class CinlodevPersistentMemoryCard implements Component {
 		};
 
 		// 1. Top border with Title & Glyph
-		const titleGlyph = g.brand || "✿";
+		const titleGlyph = g.brand || "";
 		const rawTitle = safeWidth < 40
 			? `${c.pink(titleGlyph)} ${c.salmon("PERSISTENT MEMORY")}`
 			: `${c.pink(titleGlyph)} ${c.salmon("PERSISTENT MEMORY")} ${c.dim("· Knowledge Base")}`;
@@ -355,4 +355,4 @@ export class CinlodevPersistentMemoryCard implements Component {
 }
 
 // Backward-compatibility alias
-export const CinlodevMemoryGraphCard = CinlodevPersistentMemoryCard;
+export const WorkspaceMemoryGraphCard = WorkspacePersistentMemoryCard;

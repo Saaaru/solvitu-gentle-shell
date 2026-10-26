@@ -1,9 +1,9 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { cuteGlyphs, safeFg } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
-import { launchEditor } from "../cute-tree.ts";
+import { solviGlyphs, safeFg } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
+import { launchEditor } from "../solvi-tree.ts";
 import {
 	fetchGitFileChanges,
 	resetGitFileChangesCache,
@@ -17,11 +17,11 @@ import { formatFilePathWithDracula } from "./git-styles.ts";
 import { launchGitDiff, launchFileDiff } from "./git-launchers.ts";
 
 /**
- * Sidebar Working Tree / Branch Diff Card for pi-cinlodev-cute.
+ * Sidebar Working Tree / Branch Diff Card for solvitu.
  * Displays dirty working tree files or active Branch Diff comparison in the GIT tab.
  * Supports full-height 50/50 alignment, internal scrolling, and diff viewer launching.
  */
-export class CinlodevWorkingTreeCard implements Component {
+export class WorkspaceWorkingTreeCard implements Component {
 	private readonly ctx?: ExtensionContext;
 	private readonly tui: TUI;
 	private readonly theme?: Theme;
@@ -122,8 +122,8 @@ export class CinlodevWorkingTreeCard implements Component {
 		const cwd = this.ctx?.cwd ?? process.cwd();
 		const safeWidth = Math.max(30, width);
 		const innerWidth = safeWidth - 4;
-		const g = cuteGlyphs(this.theme);
-		const colors = loadCuteColors();
+		const g = solviGlyphs(this.theme);
+		const colors = loadSolviColors();
 		const theme = this.theme;
 
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);

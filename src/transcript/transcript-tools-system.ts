@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg, stripAnsi } from "../cute-theme.ts";
+import { safeFg, stripAnsi } from "../solvi-theme.ts";
 import { unwrapNativeCard, KEY_HINT_TRAILING_RE } from "./transcript-unwrap.ts";
 import { highlightCodeLine, toolFileHighlightable } from "./transcript-highlight.ts";
 
@@ -214,7 +214,7 @@ export function normalizeBashHeader(line: string): string {
 }
 
 /**
- * Strips empty lines and horizontal border divider lines (e.g. ─── or ═══)
+ * Strips empty lines and horizontal border divider lines (e.g. ─── or ───)
  * from raw bash component output so it nests cleanly inside our card.
  */
 export function cleanBashLines(rawLines: string[]): string[] {
@@ -224,7 +224,7 @@ export function cleanBashLines(rawLines: string[]): string[] {
 		.filter((line) => {
 			const plain = stripAnsi(line).trim();
 			if (plain === "") return false;
-			if (/^[─═\-]+$/.test(plain)) return false;
+			if (/^[──\-]+$/.test(plain)) return false;
 			return true;
 		});
 }

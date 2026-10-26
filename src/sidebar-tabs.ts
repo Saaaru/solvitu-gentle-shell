@@ -1,8 +1,9 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { cuteGlyphs, safeFg, bolden } from "./cute-theme.ts";
+import { solviGlyphs, safeFg, bolden } from "./solvi-theme.ts";
+import { sidebarState } from "./sidebar-state.ts";
 
-export interface CuteSidebarTab {
+export interface SolviSidebarTab {
 	id: string;
 	key: string;
 	label: string;
@@ -11,34 +12,34 @@ export interface CuteSidebarTab {
 }
 
 export const SIDEBAR_TAB_CARD_MAP: Record<string, string[]> = {
-	main: ["footer", "context", "todo"],
-	git: ["gitGraph", "workingTree"],
-	prof: ["cute-profiles"],
+	skills: ["main-list", "main-viewer"],
+	git: ["gitGraph", "workingTree", "todo"],
+	prof: ["solvi-profiles"],
 	mem: ["engram", "engramHandoff", "persistentMemory", "ecosystem", "tools"],
 	tree: ["projectTree"],
-	yt: ["youtubePlayer"],
+	solvi: ["solviTab"],
 };
 
-export const CUTE_SIDEBAR_TABS: readonly CuteSidebarTab[] = [
-	{ id: "main", key: "1", label: "MAIN", title: "Main Dashboard", cards: SIDEBAR_TAB_CARD_MAP.main },
+export const SOLVI_SIDEBAR_TABS: readonly SolviSidebarTab[] = [
+	{ id: "tree", key: "1", label: "MAIN", title: "Project Tree & Explorer", cards: SIDEBAR_TAB_CARD_MAP.tree },
 	{ id: "git", key: "2", label: "GIT", title: "Git Graph & Working Tree", cards: SIDEBAR_TAB_CARD_MAP.git },
 	{ id: "prof", key: "3", label: "PROF", title: "Profiles & Clusters", cards: SIDEBAR_TAB_CARD_MAP.prof },
 	{ id: "mem", key: "4", label: "MEM", title: "Memory & Tools", cards: SIDEBAR_TAB_CARD_MAP.mem },
-	{ id: "tree", key: "5", label: "TREE", title: "Project Tree & Explorer", cards: SIDEBAR_TAB_CARD_MAP.tree },
-	{ id: "yt", key: "6", label: "YT", title: "YouTube Music Player", cards: SIDEBAR_TAB_CARD_MAP.yt },
+	{ id: "skills", key: "5", label: "SKILLS", title: "Skills & MCP", cards: SIDEBAR_TAB_CARD_MAP.skills },
+	{ id: "solvi", key: "6", label: "Solvi", title: "Solvi", cards: SIDEBAR_TAB_CARD_MAP.solvi },
 ];
 
-export function resolveSidebarTab(tabIdOrKey?: string): CuteSidebarTab {
+export function resolveSidebarTab(tabIdOrKey?: string): SolviSidebarTab {
 	if (tabIdOrKey) {
 		let normalized = tabIdOrKey.toLowerCase();
 		if (normalized === "forge" || normalized === "agents" || normalized === "usage") normalized = "prof";
 		if (normalized === "projecttree" || normalized === "project-tree") normalized = "tree";
-		const match = CUTE_SIDEBAR_TABS.find(
+		const match = SOLVI_SIDEBAR_TABS.find(
 			(t) => t.id === normalized || t.key === normalized || t.label.toLowerCase() === normalized
 		);
 		if (match) return match;
 	}
-	return CUTE_SIDEBAR_TABS[0];
+	return SOLVI_SIDEBAR_TABS[0];
 }
 
 export interface TabHitbox {
@@ -49,7 +50,7 @@ export interface TabHitbox {
 	endX: number;
 }
 
-export function renderCuteSidebarTabBar(
+export function renderSolviSidebarTabBar(
 	width: number,
 	activeTabId: string,
 	theme?: Theme,
@@ -66,7 +67,7 @@ export function renderCuteSidebarTabBar(
 
 	const compactActive = width < 44;
 
-	const tabVisuals = CUTE_SIDEBAR_TABS.map((tab) => {
+	const tabVisuals = SOLVI_SIDEBAR_TABS.map((tab) => {
 		const isActive = tab.id === activeTab.id;
 		const extraSuffix = tab.id === "git" && gitSyncBadge ? ` ${gitSyncBadge}` : "";
 
@@ -85,7 +86,7 @@ export function renderCuteSidebarTabBar(
 	});
 
 	const totalTabLen = tabVisuals.reduce((acc, t) => acc + t.len, 0);
-	const gapsCount = CUTE_SIDEBAR_TABS.length - 1;
+	const gapsCount = SOLVI_SIDEBAR_TABS.length - 1;
 	const remaining = Math.max(0, width - totalTabLen);
 	const baseGap = gapsCount > 0 ? Math.floor(remaining / gapsCount) : 0;
 	let extraSpaces = gapsCount > 0 ? remaining % gapsCount : 0;
@@ -121,7 +122,7 @@ export function renderCuteSidebarTabBar(
 		parts.push(" ".repeat(width - currentX));
 	}
 
-	const glyphs = cuteGlyphs(theme);
+	const glyphs = solviGlyphs(theme);
 	const sepChar = glyphs.frameStyle === "ascii" || glyphs.h === "-" ? "-" : "─";
 	const divider = subtle(sepChar.repeat(Math.max(0, width)));
 
@@ -142,4 +143,14 @@ export function renderCuteSidebarTabBar(
 		divider,
 		hitboxes: validHitboxes,
 	};
+}
+
+/** Moves the active sidebar tab by `delta` (wraps around). Used by the Alt+arrow shortcuts. */
+export function cycleSidebarTab(tui: { requestRender(): void }, delta: number): void {
+	const state = sidebarState(tui as any);
+	const current = resolveSidebarTab(state.activeTabId).id;
+	const index = SOLVI_SIDEBAR_TABS.findIndex((t) => t.id === current);
+	const next = (index + delta + SOLVI_SIDEBAR_TABS.length) % SOLVI_SIDEBAR_TABS.length;
+	state.activeTabId = SOLVI_SIDEBAR_TABS[next].id;
+	tui.requestRender();
 }

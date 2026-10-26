@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import { cuteGlyphs } from "../src/cute-theme.ts";
+import { solviGlyphs } from "../src/solvi-theme.ts";
 import {
-	loadCuteStrings,
+	loadSolviStrings,
 	detectSystemUser,
-} from "../src/cute-strings.ts";
-import { loadCuteLayout } from "../src/cute-layout.ts";
+} from "../src/solvi-strings.ts";
+import { loadSolviLayout } from "../src/solvi-layout.ts";
 import { userConfigFile, resetAll } from "./test-helpers.ts";
 
 test("Strings - defaults are Gentleman and developer", () => {
@@ -16,7 +16,7 @@ test("Strings - defaults are Gentleman and developer", () => {
 		if (fs.existsSync(userConfigFile)) fs.unlinkSync(userConfigFile);
 		resetAll();
 
-		const strings = loadCuteStrings();
+		const strings = loadSolviStrings();
 		assert.equal(strings.welcomePersona.name, "el Gentleman");
 		assert.equal(strings.welcomePersona.userRole, "desarrollador");
 		assert.equal(strings.welcomePersona.userPronoun, "Tratalo");
@@ -53,9 +53,9 @@ test("User Overrides - custom persona, user name and animation preset", () => {
 
 		resetAll();
 
-		const strings = loadCuteStrings();
-		const glyphs = cuteGlyphs();
-		const layout = loadCuteLayout();
+		const strings = loadSolviStrings();
+		const glyphs = solviGlyphs();
+		const layout = loadSolviLayout();
 
 		assert.equal(strings.welcomePersona.name, "la Gentlewoman");
 		assert.equal(strings.welcomePersona.user, "Cinlo");
@@ -65,10 +65,10 @@ test("User Overrides - custom persona, user name and animation preset", () => {
 		assert.equal(strings.welcomeTitles.dashboard, "Gentlewoman Welcome Dashboard");
 
 		assert.deepEqual(glyphs.petalFrames, ["/•᷅•᷄\\੭", "/◕᷅◕᷄\\੭", "/˘᷅˘᷄\\੭", "/•᷅◕᷄\\੭"]);
-		assert.equal(glyphs.tl, "╔"); // untouched default preserved
+		assert.equal(glyphs.tl, "┌"); // untouched default preserved
 		assert.equal(layout.sidebar.railWidth, 54);
 
-		// Also test when cute.json contains BOTH root persona/user AND a nested "strings" block:
+		// Also test when solvi.json contains BOTH root persona/user AND a nested "strings" block:
 		fs.writeFileSync(
 			userConfigFile,
 			JSON.stringify(
@@ -76,7 +76,7 @@ test("User Overrides - custom persona, user name and animation preset", () => {
 					user: "Cinlo",
 					persona: "gentlewoman",
 					strings: {
-						brandTitle: "✿ Cinlodev",
+						brandTitle: "✿ Workspace",
 					},
 				},
 				null,
@@ -86,12 +86,12 @@ test("User Overrides - custom persona, user name and animation preset", () => {
 		);
 		resetAll();
 
-		const stringsWithNested = loadCuteStrings();
+		const stringsWithNested = loadSolviStrings();
 		assert.equal(stringsWithNested.welcomePersona.name, "la Gentlewoman");
 		assert.equal(stringsWithNested.welcomePersona.user, "Cinlo");
 		assert.equal(stringsWithNested.welcomePersona.userRole, "desarrolladora");
 		assert.equal(stringsWithNested.welcomePersona.userPronoun, "Tratala");
-		assert.equal(stringsWithNested.brandTitle, "✿ Cinlodev");
+		assert.equal(stringsWithNested.brandTitle, "✿ Workspace");
 	} finally {
 		if (originalContent !== null) {
 			fs.writeFileSync(userConfigFile, originalContent, "utf8");
@@ -107,8 +107,8 @@ test("User detection - detectSystemUser fallback and caching", () => {
 	assert.ok(typeof user === "string" && user.length > 0);
 });
 
-test("Local Overrides - cute.local.json in workspace overrides defaults", () => {
-	const localFile = "cute.local.json";
+test("Local Overrides - solvi.local.json in workspace overrides defaults", () => {
+	const localFile = "solvi.local.json";
 	const hadLocal = fs.existsSync(localFile);
 	const prevLocal = hadLocal ? fs.readFileSync(localFile, "utf8") : null;
 	try {
@@ -127,8 +127,8 @@ test("Local Overrides - cute.local.json in workspace overrides defaults", () => 
 		);
 		resetAll();
 
-		const strings = loadCuteStrings();
-		const glyphs = cuteGlyphs();
+		const strings = loadSolviStrings();
+		const glyphs = solviGlyphs();
 
 		assert.equal(strings.welcomePersona.name, "la Gentlewoman");
 		assert.equal(strings.welcomePersona.user, "TestDev");

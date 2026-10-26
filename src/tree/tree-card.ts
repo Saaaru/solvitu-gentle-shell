@@ -2,11 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { bolden, cuteGlyphs, cutePalette, safeFg } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
-import { detectProjectName } from "../cute-engram.ts";
-import { fetchGitFileChanges } from "../cute-git-graph.ts";
+import { bolden, solviGlyphs, solviPalette, safeFg } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
+import { detectProjectName } from "../solvi-engram.ts";
+import { fetchGitFileChanges } from "../solvi-git-graph.ts";
 import {
 	type TreeNode,
 	type TreeHitbox,
@@ -18,9 +18,9 @@ import {
 import { launchEditor } from "./tree-launchers.ts";
 
 /**
- * Interactive Project Tree & Explorer Card for the CUTE Sidebar.
+ * Interactive Project Tree & Explorer Card for the SOLVI Sidebar.
  */
-export class CinlodevProjectTreeCard implements Component {
+export class WorkspaceProjectTreeCard implements Component {
 	private readonly ctx?: ExtensionContext;
 	private readonly tui?: TUI;
 	private readonly theme?: Theme;
@@ -194,8 +194,8 @@ export class CinlodevProjectTreeCard implements Component {
 		const safeWidth = Math.max(30, width);
 		const innerWidth = safeWidth - 4;
 		const theme = this.theme;
-		const g = cuteGlyphs(theme);
-		const colors = loadCuteColors();
+		const g = solviGlyphs(theme);
+		const colors = loadSolviColors();
 
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);
 		const c = {
@@ -239,7 +239,7 @@ export class CinlodevProjectTreeCard implements Component {
 		const fixedOverhead = 8 + activeBadgeLen;
 		const availableForTitle = Math.max(0, safeWidth - fixedOverhead);
 
-		const flowerIcon = g.flower || "✿";
+		const flowerIcon = g.flower || "";
 		let titleStyled = "";
 		let titleRawLen = 0;
 
@@ -320,7 +320,11 @@ export class CinlodevProjectTreeCard implements Component {
 		const visibleRows = allRows.slice(this.scrollOffset, this.scrollOffset + maxVisibleRows);
 		const lines: string[] = [top];
 
-		// Map dirty Git files and parent directories
+		// Map dirty Git files and parent directories. `fetchGitFileChanges` reports paths
+		// with "/" (git's own porcelain format), but `row.node.relPath` comes from
+		// `path.relative()` and uses "\" on Windows — normalize both sides to "/" so the
+		// lookups below actually match there.
+		const toPosix = (p: string): string => p.replace(/\\/g, "/");
 		const gitChanges = fetchGitFileChanges(this.cwd);
 		const gitStatusMap = new Map<string, string>();
 		const dirtyDirSet = new Set<string>();
@@ -340,7 +344,7 @@ export class CinlodevProjectTreeCard implements Component {
 			if (row.node.isDirectory) {
 				const isExpanded = this.expandedDirs.has(row.node.relPath);
 				const folderIcon = isExpanded ? "📂 " : "📁 ";
-				const hasDirtyChildren = dirtyDirSet.has(row.node.relPath);
+				const hasDirtyChildren = dirtyDirSet.has(toPosix(row.node.relPath));
 				const folderName = hasDirtyChildren ? c.yellow(row.node.name) : c.cyan(row.node.name);
 				const countStr = typeof row.node.itemCount === "number" ? c.dim(` (${row.node.itemCount} items)`) : "";
 				const rightBadge = hasDirtyChildren ? c.yellow("●") : "";
@@ -356,7 +360,7 @@ export class CinlodevProjectTreeCard implements Component {
 				});
 			} else {
 				const fileIcon = `${getFileIcon(row.node.extension)} `;
-				const fileGitStatus = gitStatusMap.get(row.node.relPath);
+				const fileGitStatus = gitStatusMap.get(toPosix(row.node.relPath));
 				let rightBadge = "";
 				let fileColor = c.text;
 				const ext = (row.node.extension || "").toLowerCase();

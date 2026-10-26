@@ -58,9 +58,9 @@ function queryToolVersion(binary: string, args: string[] = ["--version"]): Promi
 }
 
 /**
- * Reads local package.json version of CUTE extension.
+ * Reads local package.json version of SOLVI extension.
  */
-export function resolveCutePackageVersion(): string {
+export function resolveSolviPackageVersion(): string {
 	try {
 		const pkgPath = join(import.meta.dirname ?? process.cwd(), "..", "..", "package.json");
 		if (existsSync(pkgPath)) {
@@ -125,7 +125,7 @@ export async function detectEcosystemTools(): Promise<EcosystemData> {
 	]);
 
 	const gentleShellVer = gentleShellCliVer || resolveGentleShellPackageVersion();
-	const cuteVer = resolveCutePackageVersion();
+	const solviVer = resolveSolviPackageVersion();
 
 	const tools: EcosystemToolInfo[] = [
 		{
@@ -136,9 +136,9 @@ export async function detectEcosystemTools(): Promise<EcosystemData> {
 			accent: "cyan",
 		},
 		{
-			id: "cute",
-			name: "cute",
-			version: cuteVer,
+			id: "solvi",
+			name: "solvi",
+			version: solviVer,
 			available: true,
 			accent: "pink",
 		},

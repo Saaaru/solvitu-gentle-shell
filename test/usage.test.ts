@@ -13,10 +13,10 @@ import {
 	prioritizeActiveAccount,
 	setCachedAccountsForTesting,
 	getQuotaThreshold,
-} from "../src/cute-usage.ts";
+} from "../src/solvi-usage.ts";
 import { resetAll, userConfigFile } from "./test-helpers.ts";
 
-test("cute-usage - getQuotaThreshold 4-tier semáforo dynamic colors", () => {
+test("solvi-usage - getQuotaThreshold 4-tier semáforo dynamic colors", () => {
 	const mockPalette = {
 		mint: (s: string) => `[mint]${s}[/mint]`,
 		gold: (s: string) => `[gold]${s}[/gold]`,
@@ -77,7 +77,7 @@ test("cute-usage - getQuotaThreshold 4-tier semáforo dynamic colors", () => {
 	assert.equal(critical0.color("●"), "[coral]●[/coral]");
 });
 
-test("cute-usage - parseRawUsageToAccounts and formatRelativeReset", () => {
+test("solvi-usage - parseRawUsageToAccounts and formatRelativeReset", () => {
 	// 1. Relative reset formatting
 	const now = 1726700000000;
 	assert.equal(formatRelativeReset(null, now), "");

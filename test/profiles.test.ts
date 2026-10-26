@@ -11,18 +11,36 @@ import {
 	extractAccountFromModel,
 	extractUniqueAccounts,
 	loadProfileDetails,
-	CinlodevProfilesExtendedCard,
+	WorkspaceProfilesExtendedCard,
 	getActiveProfileDetails,
-} from "../src/cute-profiles.ts";
-import { resetActiveProfileCache } from "../src/cute-paths.ts";
-import { setCachedAccountsForTesting } from "../src/cute-usage.ts";
+} from "../src/solvi-profiles.ts";
+import { resetActiveProfileCache } from "../src/solvi-paths.ts";
+import { setCachedAccountsForTesting } from "../src/solvi-usage.ts";
 import { resetAll, userConfigFile } from "./test-helpers.ts";
 
-test("cute-profiles - listAvailableProfiles and SDD_PROFILES_API_SYMBOL integration", () => {
-	// 1. Filesystem discovery
-	const profiles = listAvailableProfiles(process.cwd());
-	assert.ok(Array.isArray(profiles), "profiles should be an array");
-	assert.ok(profiles.length > 0, "should find profiles on system/builtin");
+test("solvi-profiles - listAvailableProfiles and SDD_PROFILES_API_SYMBOL integration", () => {
+	// 1. Filesystem discovery. Builds its own project profile dir instead of relying on
+	// ~/.pi/agent/... or a builtin SDD profiles checkout existing on the host machine.
+	const tempCwd = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-profiles-fs-"));
+	try {
+		const projectProfilesDir = path.join(tempCwd, ".pi", "profiles");
+		fs.mkdirSync(projectProfilesDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(projectProfilesDir, "fixture-profile.json"),
+			JSON.stringify({ name: "fixture-profile", description: "Test fixture" }),
+			"utf8",
+		);
+
+		const profiles = listAvailableProfiles(tempCwd);
+		assert.ok(Array.isArray(profiles), "profiles should be an array");
+		assert.ok(profiles.length > 0, "should find the project profile just written to .pi/profiles");
+		assert.ok(
+			profiles.some((p) => p.name === "fixture-profile"),
+			"should include the fixture profile by name",
+		);
+	} finally {
+		fs.rmSync(tempCwd, { recursive: true, force: true });
+	}
 
 	// 2. Global API override
 	const mockApi = {
@@ -47,7 +65,7 @@ test("cute-profiles - listAvailableProfiles and SDD_PROFILES_API_SYMBOL integrat
 	}
 });
 
-test("cute-profiles - switchProfile switches active profile via API and fallback", async () => {
+test("solvi-profiles - switchProfile switches active profile via API and fallback", async () => {
 	// 1. With API
 	let activatedWith: string | null = null;
 	(globalThis as any)[SDD_PROFILES_API_SYMBOL] = {
@@ -73,9 +91,9 @@ test("cute-profiles - switchProfile switches active profile via API and fallback
 	assert.ok(notFound.message.includes("no encontrado"));
 });
 
-test("cute-profiles - getActiveProfileDetails resolves active profile via readActiveProfile and API", () => {
+test("solvi-profiles - getActiveProfileDetails resolves active profile via readActiveProfile and API", () => {
 	resetActiveProfileCache();
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-active-details-test-"));
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-active-details-test-"));
 	try {
 		// 1. Filesystem project-local resolution
 		const projDir = path.join(tmpDir, ".pi", "profiles");
@@ -118,7 +136,7 @@ test("cute-profiles - getActiveProfileDetails resolves active profile via readAc
 });
 
 
-test("cute-profiles - extractAccountFromModel parses accounts from model strings", () => {
+test("solvi-profiles - extractAccountFromModel parses accounts from model strings", () => {
 	assert.equal(extractAccountFromModel("cpamc/ranchesca/gemini-3.8-flash-high"), "ranchesca");
 	assert.equal(extractAccountFromModel("cpamc/nekocin01/gemini-3.8-flash-high"), "nekocin01");
 	assert.equal(extractAccountFromModel("cpamc/cinlo_dig/gemini-3.8-flash-high"), "cinlo_dig");
@@ -129,7 +147,7 @@ test("cute-profiles - extractAccountFromModel parses accounts from model strings
 	assert.equal(extractAccountFromModel(undefined), null);
 });
 
-test("cute-profiles - extractUniqueAccounts collects unique accounts in order from profile", () => {
+test("solvi-profiles - extractUniqueAccounts collects unique accounts in order from profile", () => {
 	const sampleProfile = {
 		name: "cinlo1",
 		default_model: "cpamc/ranchesca/gemini-3.8-flash-high",
@@ -149,8 +167,8 @@ test("cute-profiles - extractUniqueAccounts collects unique accounts in order fr
 	assert.deepEqual(accounts, ["ranchesca", "nekocin01", "cinlo_dig", "cin82", "neko02"]);
 });
 
-test("cute-profiles - loadProfileDetails loads from temporary project directory", () => {
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-profile-load-"));
+test("solvi-profiles - loadProfileDetails loads from temporary project directory", () => {
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-profile-load-"));
 	try {
 		const projDir = path.join(tmpDir, ".pi", "profiles");
 		fs.mkdirSync(projDir, { recursive: true });
@@ -178,9 +196,9 @@ test("cute-profiles - loadProfileDetails loads from temporary project directory"
 	}
 });
 
-test("cute-profiles - CinlodevProfilesExtendedCard renders switcher, accounts, subagent tree, and handles clicks", async () => {
+test("solvi-profiles - WorkspaceProfilesExtendedCard renders switcher, accounts, subagent tree, and handles clicks", async () => {
 	resetAll();
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-profile-card-"));
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-profile-card-"));
 	try {
 		const projDir = path.join(tmpDir, ".pi", "profiles");
 		fs.mkdirSync(projDir, { recursive: true });
@@ -266,7 +284,7 @@ test("cute-profiles - CinlodevProfilesExtendedCard renders switcher, accounts, s
 			},
 		};
 
-		const card = new CinlodevProfilesExtendedCard(mockTui, undefined, tmpDir);
+		const card = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir);
 		const lines = card.render(52);
 		assert.ok(lines.length > 0, "Card should render lines");
 		const fullText = lines.join("\n");
@@ -320,7 +338,7 @@ test("cute-profiles - CinlodevProfilesExtendedCard renders switcher, accounts, s
 		// Check breathing room spacer lines between agents
 		const emptySpacerLines = lines.filter((l) => {
 			const cleaned = l.replace(/\x1b\[[0-9;]*m/g, "");
-			return cleaned.startsWith("║") && cleaned.endsWith("║") && cleaned.slice(1, -1).trim() === "";
+			return cleaned.startsWith("│") && cleaned.endsWith("│") && cleaned.slice(1, -1).trim() === "";
 		});
 		assert.ok(emptySpacerLines.length >= 2, "Should have empty spacer lines between agents for breathing room");
 
@@ -375,9 +393,9 @@ test("cute-profiles - CinlodevProfilesExtendedCard renders switcher, accounts, s
 	}
 });
 
-test("cute-profiles - CinlodevProfilesExtendedCard internal scrolling and height constraint", () => {
+test("solvi-profiles - WorkspaceProfilesExtendedCard internal scrolling and height constraint", () => {
 	resetAll();
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-scroll-test-"));
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-scroll-test-"));
 	try {
 		const projDir = path.join(tmpDir, ".pi", "profiles");
 		fs.mkdirSync(projDir, { recursive: true });
@@ -408,7 +426,7 @@ test("cute-profiles - CinlodevProfilesExtendedCard internal scrolling and height
 			},
 		};
 
-		const card = new CinlodevProfilesExtendedCard(mockTui, undefined, tmpDir);
+		const card = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir);
 
 		// 1. Calling render(52, 25) constrains lines to exactly 25
 		const lines = card.render(52, 25);
@@ -469,7 +487,7 @@ test("cute-profiles - CinlodevProfilesExtendedCard internal scrolling and height
 	}
 });
 
-test("cute-profiles - edge cases for account extraction and empty profiles", () => {
+test("solvi-profiles - edge cases for account extraction and empty profiles", () => {
 	// Malformed model strings
 	assert.equal(extractAccountFromModel("cpamc//model"), null);
 	assert.equal(extractAccountFromModel("cpamc/ranchesca"), null);
@@ -487,8 +505,8 @@ test("cute-profiles - edge cases for account extraction and empty profiles", () 
 	assert.equal(loadProfileDetails("does-not-exist-xyz", "/tmp"), null);
 });
 
-test("cute-profiles - dynamic multi-provider matching and single pool rendering (Gemini/Argon & Codex)", () => {
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cute-profiles-provider-"));
+test("solvi-profiles - dynamic multi-provider matching and single pool rendering (Gemini/Argon & Codex)", () => {
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-profiles-provider-"));
 	const profilesDir = path.join(tmpDir, ".pi", "profiles");
 	fs.mkdirSync(profilesDir, { recursive: true });
 
@@ -499,7 +517,7 @@ test("cute-profiles - dynamic multi-provider matching and single pool rendering 
 		default_effort: "high",
 		model_profiles: {
 			"gentle-ai-worker": {
-				model: "cpamc/cinlodev/gemini-4-argon-high",
+				model: "cpamc/testacct/gemini-4-argon-high",
 				effort: "high",
 			},
 		},
@@ -509,7 +527,7 @@ test("cute-profiles - dynamic multi-provider matching and single pool rendering 
 	fs.writeFileSync(path.join(profilesDir, ".active"), "test-multiprovider");
 
 	// Provide two colliding accounts: 'cilon' (antigravity) and 'cilon-gpt' (codex),
-	// plus 'cinlodev' with ONLY weekly pool (like Gemini/Argon)
+	// plus 'testacct' with ONLY weekly pool (like Gemini/Argon)
 	setCachedAccountsForTesting([
 		{
 			provider: "antigravity",
@@ -528,7 +546,7 @@ test("cute-profiles - dynamic multi-provider matching and single pool rendering 
 		},
 		{
 			provider: "antigravity",
-			prefix: "cinlodev",
+			prefix: "testacct",
 			pools: [
 				// Only 1 pool: Weekly
 				{ label: "Gemini Models · Weekly Limit Remaining", availablePercent: 100, used: 0, total: 100, unlimited: false, resetAt: null },
@@ -538,7 +556,7 @@ test("cute-profiles - dynamic multi-provider matching and single pool rendering 
 
 	try {
 		const mockTui: any = { requestRender: () => {} };
-		const card = new CinlodevProfilesExtendedCard(mockTui, undefined, tmpDir);
+		const card = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir);
 		const lines = card.render(50);
 		const fullText = lines.join("\n");
 
@@ -548,11 +566,11 @@ test("cute-profiles - dynamic multi-provider matching and single pool rendering 
 		assert.ok(fullText.includes("81%"), "Host must display 81% from codex account");
 		assert.ok(!fullText.includes("10%"), "Host must NOT accidentally match antigravity cilon account");
 
-		// 2. Worker using Gemini/Argon in cinlodev has only 1 weekly pool (100%)
-		assert.ok(fullText.includes("cinlodev"), "Worker must list cinlodev account");
+		// 2. Worker using Gemini/Argon in testacct has only 1 weekly pool (100%)
+		assert.ok(fullText.includes("testacct"), "Worker must list testacct account");
 		assert.ok(fullText.includes("100%"), "Worker with Argon must show 100% weekly quota");
-		// Verify dynamic label Semanal is rendered cleanly alongside the @cinlodev prefix
-		assert.ok(fullText.includes("@cinlodev · Semanal"), "Single-pool account must render @cinlodev · Semanal on first line");
+		// Verify dynamic label Semanal is rendered cleanly alongside the @testacct prefix
+		assert.ok(fullText.includes("@testacct · Semanal"), "Single-pool account must render @testacct · Semanal on first line");
 	} finally {
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 		resetAll();

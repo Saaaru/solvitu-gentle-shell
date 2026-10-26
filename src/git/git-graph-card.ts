@@ -1,10 +1,10 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { cuteGlyphs, safeFg, bolden } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { loadCuteLayout } from "../cute-layout.ts";
-import { readGitBranch } from "../cute-paths.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
+import { solviGlyphs, safeFg, bolden } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { loadSolviLayout } from "../solvi-layout.ts";
+import { readGitBranch } from "../solvi-paths.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
 import {
 	type GitStatusCounts,
 	fetchGitLogGraph,
@@ -30,12 +30,12 @@ import {
 const SIDEBAR_STATE = Symbol.for("gentle-pi.experimental-sidebar.state");
 
 /**
- * Interactive Git Graph card for the Cinlodev CUTE sidebar rail.
+ * Interactive Git Graph card for the Workspace sidebar rail.
  * - Shows an interactive Dracula-styled git graph or branches list in the rail.
  * - Supports [ Grafo | Ramas ] view switching and branch selection for diff inspection.
  * - Full-height fixed alignment and mouse wheel internal scrolling.
  */
-export class CinlodevGitGraphCard implements Component {
+export class WorkspaceGitGraphCard implements Component {
 	private readonly ctx?: ExtensionContext;
 	private readonly tui: TUI;
 	private readonly theme?: Theme;
@@ -50,7 +50,7 @@ export class CinlodevGitGraphCard implements Component {
 		this.ctx = ctx;
 		this.tui = tui ?? ({ requestRender: () => {} } as any);
 		this.theme = theme;
-		const cfg = loadCuteLayout().gitGraph;
+		const cfg = loadSolviLayout().gitGraph;
 		this.expanded = cfg.defaultExpanded ?? true;
 	}
 
@@ -160,7 +160,7 @@ export class CinlodevGitGraphCard implements Component {
 	}
 
 	render(width: number, availableHeight?: number): string[] {
-		const cfg = loadCuteLayout().gitGraph;
+		const cfg = loadSolviLayout().gitGraph;
 		if (!cfg.enabled) return [];
 
 		const cwd = this.ctx?.cwd ?? process.cwd();
@@ -168,9 +168,9 @@ export class CinlodevGitGraphCard implements Component {
 		if (!rawLines.length) return [];
 
 		const safeWidth = Math.max(cfg.minWidth, width);
-		const innerWidth = safeWidth - 4; // ║ + space + content + space + ║
-		const g = cuteGlyphs(this.theme);
-		const colors = loadCuteColors();
+		const innerWidth = safeWidth - 4; // │ + space + content + space + │
+		const g = solviGlyphs(this.theme);
+		const colors = loadSolviColors();
 		const theme = this.theme;
 
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);

@@ -1,0 +1,31 @@
+/**
+ * Quota & Usage Monitor for SOLVI Sidebar.
+ * Facade module re-exporting from domain modules in src/usage/ for backwards compatibility.
+ */
+
+export {
+	type QuotaPoolDisplay,
+	type QuotaAccountDisplay,
+	type QuotaThreshold,
+	getQuotaThreshold,
+	cleanPoolLabel,
+	cleanDynamicPoolLabel,
+	formatRelativeReset,
+	prioritizeActiveAccount,
+} from "./usage/usage-thresholds.ts";
+
+export {
+	resolveManagementKey,
+	resolveBaseUrl,
+	resolveActiveOrchestratorPrefix,
+	resetUsageCache,
+	getCachedAccounts,
+	getUsageLastError,
+	setCachedAccountsForTesting,
+	fetchPrefixMap,
+	parseRawUsageToAccounts,
+	fetchUsageAccounts,
+	triggerUsageRefresh,
+} from "./usage/usage-client.ts";
+
+

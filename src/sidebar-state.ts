@@ -1,8 +1,8 @@
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { safeFg } from "./cute-theme.ts";
-import { loadCuteStrings, detectSystemUser } from "./cute-strings.ts";
+import { safeFg } from "./solvi-theme.ts";
+import { loadSolviStrings, detectSystemUser } from "./solvi-strings.ts";
 
 // State symbol shared across extensions on tui.terminal
 export const SIDEBAR_STATE_KEY = Symbol.for("gentle-pi.experimental-sidebar.state");
@@ -50,12 +50,12 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Renders the top decorative banner for the CUTE sidebar rail.
+ * Renders the top decorative banner for the SOLVI sidebar rail.
  */
-export function renderCUTESidebarBanner(width: number, theme?: Theme): string[] {
+export function renderSolviSidebarBanner(width: number, theme?: Theme): string[] {
 	const pink = (s: string): string => (theme ? safeFg(theme, "pinkBright", s) : s);
 	const text = (s: string): string => (theme ? safeFg(theme, "text", s) : s);
-	const strings = loadCuteStrings();
+	const strings = loadSolviStrings();
 	const user = strings.welcomePersona.user || detectSystemUser();
 	const banner = strings.sidebarBanner;
 

@@ -1,8 +1,8 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { cuteGlyphs, safeFg } from "../cute-theme.ts";
-import { loadCuteColors } from "../cute-colors.ts";
-import { calcVisibleWidth, truncateAnsiAware } from "../cute-transcript.ts";
+import { solviGlyphs, safeFg } from "../solvi-theme.ts";
+import { loadSolviColors } from "../solvi-colors.ts";
+import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
 import {
 	detectProjectName,
 	formatRelativeTime,
@@ -11,10 +11,10 @@ import {
 } from "./engram-client.ts";
 
 /**
- * Sidebar Engram Handoff Snapshot Card for pi-cinlodev-cute.
+ * Sidebar Engram Handoff Snapshot Card for solvitu.
  * Displays the latest session summary and active context directly below Engram in the MEM tab.
  */
-export class CinlodevEngramHandoffCard implements Component {
+export class WorkspaceEngramHandoffCard implements Component {
 	private readonly ctx?: ExtensionContext;
 	private readonly tui: TUI;
 	private readonly theme?: Theme;
@@ -63,8 +63,8 @@ export class CinlodevEngramHandoffCard implements Component {
 
 		const safeWidth = Math.max(30, width);
 		const innerWidth = safeWidth - 4;
-		const g = cuteGlyphs(this.theme);
-		const colors = loadCuteColors();
+		const g = solviGlyphs(this.theme);
+		const colors = loadSolviColors();
 		const theme = this.theme;
 
 		const frame = (s: string): string => (theme ? safeFg(theme, colors.sidebarBorder, s) : s);

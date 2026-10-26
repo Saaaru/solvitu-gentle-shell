@@ -4,8 +4,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 
-export interface CuteGlyphs {
-	frameStyle: CuteFrameStyle;
+export interface SolviGlyphs {
+	frameStyle: SolviFrameStyle;
 	tl: string;
 	tr: string;
 	bl: string;
@@ -25,35 +25,35 @@ export interface CuteGlyphs {
 	gaugeEmpty: string;
 }
 
-const DOUBLE_GLYPHS: CuteGlyphs = {
+const DOUBLE_GLYPHS: SolviGlyphs = {
 	frameStyle: "double",
-	tl: "╔",
-	tr: "╗",
-	bl: "╚",
-	br: "╝",
-	h: "═",
-	v: "║",
-	dividerL: "╠",
-	dividerR: "╣",
+	tl: "┌",
+	tr: "┐",
+	bl: "└",
+	br: "┘",
+	h: "─",
+	v: "│",
+	dividerL: "├",
+	dividerR: "┤",
 	separator: "│",
 	dot: "·",
 	brand: "◆",
 	profileIcon: "👤",
 	spinnerFrames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
-	petalFrames: ["✿", "❀", "❁", "✾"],
+	petalFrames: ["🐝"],
 	branch: "\ue0a0",
 	gaugeFilled: "▰",
 	gaugeEmpty: "▱",
 };
 
-const FRAME_PRESETS: Record<CuteFrameStyle, Pick<CuteGlyphs, "tl" | "tr" | "bl" | "br" | "h" | "v" | "dividerL" | "dividerR">> = {
-	double: { tl: "╔", tr: "╗", bl: "╚", br: "╝", h: "═", v: "║", dividerL: "╠", dividerR: "╣" },
+const FRAME_PRESETS: Record<SolviFrameStyle, Pick<SolviGlyphs, "tl" | "tr" | "bl" | "br" | "h" | "v" | "dividerL" | "dividerR">> = {
+	double: { tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│", dividerL: "├", dividerR: "┤" },
 	single: { tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│", dividerL: "├", dividerR: "┤" },
 	rounded: { tl: "╭", tr: "╮", bl: "╰", br: "╯", h: "─", v: "│", dividerL: "├", dividerR: "┤" },
 	ascii: { tl: "+", tr: "+", bl: "+", br: "+", h: "-", v: "|", dividerL: "+", dividerR: "+" },
 };
 
-const ASCII_FALLBACK: CuteGlyphs = {
+const ASCII_FALLBACK: SolviGlyphs = {
 	frameStyle: "ascii",
 	tl: "+",
 	tr: "+",
@@ -74,11 +74,11 @@ const ASCII_FALLBACK: CuteGlyphs = {
 	gaugeEmpty: "-",
 };
 
-export type CutePetalPreset = "petals" | "cats" | "kittens" | "sparkles" | "stars" | "hearts" | "ascii";
+export type SolviPetalPreset = "petals" | "cats" | "kittens" | "sparkles" | "stars" | "hearts" | "ascii";
 
 export const PETAL_PRESETS: Record<string, string[]> = {
-	petals: ["✿", "❀", "❁", "✾"],
-	flowers: ["✿", "❀", "❁", "✾"],
+	petals: ["🐝"],
+	flowers: ["🐝"],
 	cats: ["/•᷅•᷄\\੭", "/◕᷅◕᷄\\੭", "/˘᷅˘᷄\\੭", "/•᷅◕᷄\\੭"],
 	kittens: ["/×᷅×᷄\\੭", "/-᷅-᷄\\੭", "/^᷅^᷄\\੭", "/o᷅o᷄\\੭"],
 	sparkles: ["✦", "✧", "★", "☆"],
@@ -95,13 +95,13 @@ function pickGlyph(source: unknown, fallback: string): string {
 	return typeof source === "string" && source.length > 0 ? source : fallback;
 }
 
-function normalizeFrameStyle(source: unknown): CuteFrameStyle {
+function normalizeFrameStyle(source: unknown): SolviFrameStyle {
 	return source === "single" || source === "rounded" || source === "ascii" ? source : "double";
 }
 
 /** Merge a parsed `glyphs` JSON value over the base glyphs (defaults to DOUBLE_GLYPHS). */
-function mergeGlyphs(raw: unknown, baseGlyphs: CuteGlyphs = DOUBLE_GLYPHS): CuteGlyphs {
-	const base: CuteGlyphs = {
+function mergeGlyphs(raw: unknown, baseGlyphs: SolviGlyphs = DOUBLE_GLYPHS): SolviGlyphs {
+	const base: SolviGlyphs = {
 		...baseGlyphs,
 		spinnerFrames: [...baseGlyphs.spinnerFrames],
 		petalFrames: [...baseGlyphs.petalFrames],
@@ -178,12 +178,12 @@ function mergeGlyphs(raw: unknown, baseGlyphs: CuteGlyphs = DOUBLE_GLYPHS): Cute
 	return base;
 }
 
-let cachedGlyphs: CuteGlyphs | null = null;
+let cachedGlyphs: SolviGlyphs | null = null;
 
 function isPackageClone(dir: string): boolean {
 	try {
 		const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
-		return pkg?.name === "pi-cinlodev-cute";
+		return pkg?.name === "solvitu";
 	} catch {
 		return false;
 	}
@@ -205,22 +205,29 @@ function candidateGlyphsFiles(): string[] {
 	try {
 		const here = path.dirname(fileURLToPath(import.meta.url));
 		const packageDir = path.resolve(here, "../..");
-		add(path.join(packageDir, "themes", "CinlodevCute.json"));
-		add(path.join(packageDir, "config", "CinlodevCute.glyphs.json"));
-		add(path.join(packageDir, "themes", "CinlodevCute.glyphs.json"));
+		add(path.join(packageDir, "themes", "Workspace.json"));
+		add(path.join(packageDir, "config", "Workspace.glyphs.json"));
+		add(path.join(packageDir, "themes", "Workspace.glyphs.json"));
 	} catch {}
 
-	// 2. User-level global overrides (~/.pi/agent, outside git, persistent across package updates)
+	// 2. User-level global overrides (~/.pi/agent, outside git, persistent across package
+	// updates). Keeps every naming generation this package has used (cute.* from
+	// pi-cinlodev-cute, workspace.json from the Workspace rename, solvi.* going forward).
 	try {
 		const agentDir = process.env.PI_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
+		add(path.join(agentDir, "solvi.json"));
+		add(path.join(agentDir, ".solvi.json"));
+		add(path.join(agentDir, "solvi.local.json"));
+		add(path.join(agentDir, "workspace.json"));
 		add(path.join(agentDir, "cute.json"));
 		add(path.join(agentDir, ".cute.json"));
 		add(path.join(agentDir, "cute.local.json"));
-		add(path.join(agentDir, "cinlodev-cute.json"));
-		add(path.join(agentDir, "cute", "CinlodevCute.glyphs.json"));
+		add(path.join(agentDir, "solvi", "Workspace.glyphs.json"));
+		add(path.join(agentDir, "solvi", "glyphs.json"));
+		add(path.join(agentDir, "solvi", "solvi.local.json"));
+		add(path.join(agentDir, "cute", "Workspace.glyphs.json"));
 		add(path.join(agentDir, "cute", "glyphs.json"));
-		add(path.join(agentDir, "cute", "cute.local.json"));
-		add(path.join(agentDir, "cinlodev-cute", "CinlodevCute.glyphs.json"));
+		add(path.join(agentDir, "cinlodev-cute", "Workspace.glyphs.json"));
 		add(path.join(agentDir, "cinlodev-cute", "glyphs.json"));
 	} catch {}
 
@@ -231,23 +238,29 @@ function candidateGlyphsFiles(): string[] {
 		const cwd = path.resolve(process.cwd());
 
 		// Local untracked overrides (supported everywhere, even in package clone)
+		add(path.join(cwd, "solvi.local.json"));
+		add(path.join(cwd, ".solvi.json"));
 		add(path.join(cwd, "cute.local.json"));
 		add(path.join(cwd, ".cute.json"));
+		add(path.join(cwd, "config", "solvi.local.json"));
+		add(path.join(cwd, "config", ".solvi.json"));
 		add(path.join(cwd, "config", "cute.local.json"));
 		add(path.join(cwd, "config", ".cute.json"));
 
 		if (cwd !== packageDir && !isPackageClone(cwd)) {
+			add(path.join(cwd, "solvi.json"));
+			add(path.join(cwd, ".pi", "solvi.json"));
+			add(path.join(cwd, ".pi", "workspace.json"));
 			add(path.join(cwd, "cute.json"));
 			add(path.join(cwd, ".pi", "cute.json"));
-			add(path.join(cwd, ".pi", "cinlodev-cute.json"));
 		}
 	} catch {}
 
 	return candidates;
 }
 
-function resolveBaseGlyphs(): CuteGlyphs {
-	let current: CuteGlyphs = mergeGlyphs(undefined, DOUBLE_GLYPHS);
+function resolveBaseGlyphs(): SolviGlyphs {
+	let current: SolviGlyphs = mergeGlyphs(undefined, DOUBLE_GLYPHS);
 	for (const file of candidateGlyphsFiles()) {
 		try {
 			if (!fs.existsSync(file)) continue;
@@ -269,10 +282,10 @@ function resolveBaseGlyphs(): CuteGlyphs {
  * stays unchanged. Missing keys fall back to ASCII so widgets keep rendering
  * without a Nerd Font.
  *
- * User overrides in ~/.pi/agent/cute.json or ~/.pi/agent/cute/CinlodevCute.glyphs.json
+ * User overrides in ~/.pi/agent/solvi.json or ~/.pi/agent/solvi/Workspace.glyphs.json
  * layer on top of package defaults and persist across package updates.
  */
-export function cuteGlyphs(theme?: unknown): CuteGlyphs {
+export function solviGlyphs(theme?: unknown): SolviGlyphs {
 	if (!cachedGlyphs) {
 		cachedGlyphs = resolveBaseGlyphs();
 	}
@@ -283,6 +296,6 @@ export function cuteGlyphs(theme?: unknown): CuteGlyphs {
 }
 
 /** Clear the in-memory glyph cache (tests and follow-up slices). */
-export function resetCuteGlyphsCache(): void {
+export function resetSolviGlyphsCache(): void {
 	cachedGlyphs = null;
 }

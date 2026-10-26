@@ -3,7 +3,7 @@ import type { TUI } from "@earendil-works/pi-tui";
 import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { loadCutePaths, readActiveProfile } from "../cute-paths.ts";
+import { loadSolviPaths, readActiveProfile } from "../solvi-paths.ts";
 import {
 	type QuotaAccountDisplay,
 	type QuotaPoolDisplay,
@@ -27,8 +27,8 @@ export function resolveManagementKey(): string {
 		}
 	} catch {}
 
-	const cutePaths = loadCutePaths();
-	const configuredPaths = Array.isArray(cutePaths.secretsPaths) ? cutePaths.secretsPaths : [];
+	const solviPaths = loadSolviPaths();
+	const configuredPaths = Array.isArray(solviPaths.secretsPaths) ? solviPaths.secretsPaths : [];
 
 	const candidateSecretsPaths: string[] = [];
 	if (process.env.CLIPROXYAPI_SECRETS_PATH) {

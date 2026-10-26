@@ -1,4 +1,4 @@
-import type { CutePalette } from "../cute-theme.ts";
+import type { SolviPalette } from "../solvi-theme.ts";
 
 export interface QuotaPoolDisplay {
 	label: string;
@@ -29,7 +29,7 @@ export interface QuotaThreshold {
  * - 20% - 39%: Orange (Alerta)
  * - < 20%: Coral (Crítico)
  */
-export function getQuotaThreshold(availablePercent: number, palette: CutePalette): QuotaThreshold {
+export function getQuotaThreshold(availablePercent: number, palette: SolviPalette): QuotaThreshold {
 	const rounded = Math.round(availablePercent);
 	if (rounded < 20) {
 		return { color: palette.coral, level: "critical", label: "Crítico" };
