@@ -25,15 +25,22 @@ function applyPatch(label, target, replacements) {
 	if (!replacements.every(([from]) => hasMatch(source, from))) {
 		throw new Error(`upstream ${label} changed; review the patch before applying`);
 	}
-	copyFileSync(target, `${target}.pre-bee.bak`);
+	// Keep the first backup: it is the pristine upstream file, later runs must not overwrite it.
+	if (!existsSync(`${target}.pre-bee.bak`)) copyFileSync(target, `${target}.pre-bee.bak`);
 	for (const [from, to] of replacements) source = source.replace(from, to);
 	writeFileSync(target, source, "utf8");
 	console.log(`${label}: patched (backup: ${target}.pre-bee.bak)`);
 }
 
+// One-line braille bee (4 cells wide) from abejitas-mini.txt. The prompt measures the glyph with
+// visibleWidth, so any width works. Frame B drops the top wing dots of the second cell (U+28DF -> U+28D6)
+// to give a wing flap while the state tone keeps pulsing.
+const BEE_IDLE = "⢔⣟⡦⠆";
+const BEE_FLAP = "⢔⣖⡦⠆";
+// The patterns also match the original flower and the previous emoji bee, so re-running upgrades either.
 const PETAL_REPLACEMENTS = [
-	['export const PROMPT_PETAL = "✿";', 'export const PROMPT_PETAL = "🐝";'],
-	['const PETAL_FRAMES = ["✿", "❀", "❁", "✾"] as const;', 'const PETAL_FRAMES = ["🐝", "🐝", "🐝", "🐝"] as const;'],
+	[/export const PROMPT_PETAL = "[^"]*";/, `export const PROMPT_PETAL = "${BEE_IDLE}";`],
+	[/const PETAL_FRAMES = \[[^\]]*\] as const;/, `const PETAL_FRAMES = ["${BEE_IDLE}", "${BEE_FLAP}"] as const;`],
 ];
 
 // Same size ASCII accent as the original rose, same "rose" plumbing/config/commands.
