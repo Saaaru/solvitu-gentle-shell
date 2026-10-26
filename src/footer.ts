@@ -15,7 +15,7 @@ import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
 import { tuneTuiScroll } from "./solvi-layout.ts";
 import { formatTokenCount, getContextThreshold } from "./solvi-metrics.ts";
 import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
-import { WorkspaceProjectTreeCard } from "./solvi-tree.ts";
+import { WorkspaceProjectTreeCard, WorkspaceFileViewerCard, getFolderState } from "./solvi-tree.ts";
 import { WorkspaceSolviTabCard } from "./solvi-tab.ts";
 import { sidebarState } from "./sidebar-state.ts";
 
@@ -186,7 +186,8 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 				profilesCard.handleRailClick(lineIndex, button, localX),
 			handleRailWheel: (delta: number) => profilesCard.handleRailWheel(delta),
 		};
-		const projectTreeCard = new WorkspaceProjectTreeCard(ctx, tui, theme);
+		const folderState = getFolderState(tui);
+		const projectTreeCard = new WorkspaceProjectTreeCard(ctx, tui, theme, undefined, folderState);
 		footerRegistry.latestProjectTree = projectTreeCard;
 		const projectTreeRail = {
 			render: (width: number, availableHeight?: number) => projectTreeCard.render(width, availableHeight),
@@ -194,6 +195,14 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 			handleRailClick: (lineIndex: number, button?: string, localX?: number) =>
 				projectTreeCard.handleRailClick(lineIndex, button, localX),
 			handleRailWheel: (delta: number) => projectTreeCard.handleWheel(delta),
+		};
+
+		const fileViewerCard = new WorkspaceFileViewerCard(folderState, theme, projectTreeCard.getCwd());
+		const fileViewerRail = {
+			render: (width: number, availableHeight?: number) => fileViewerCard.render(width, availableHeight),
+			invalidate: () => fileViewerCard.invalidate(),
+			handleRailClick: () => fileViewerCard.handleRailClick(),
+			handleRailWheel: (delta: number) => fileViewerCard.handleRailWheel(delta),
 		};
 
 		const part = sidebarPart(tui, "footer", bottom, rail);
@@ -209,6 +218,7 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 		const modelsPart = sidebarPart(tui, "models", { render: () => [] }, modelsRail);
 		const profilesPart = sidebarPart(tui, "solvi-profiles", { render: () => [] }, profilesRail);
 		const projectTreePart = sidebarPart(tui, "projectTree", { render: () => [] }, projectTreeRail);
+		const fileViewerPart = sidebarPart(tui, "fileViewer", { render: () => [] }, fileViewerRail);
 		const solviTabCard = new WorkspaceSolviTabCard(tui, theme, ctx);
 		const solviTabRail = {
 			render: (width: number, availableHeight?: number) => solviTabCard.render(width, availableHeight),
@@ -250,6 +260,7 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 				toolsPart.dispose?.();
 				profilesPart.dispose?.();
 				projectTreePart.dispose?.();
+				fileViewerPart.dispose?.();
 				solviTabPart.dispose?.();
 				solviTabCard.dispose?.();
 				todoPart.dispose?.();

@@ -16,6 +16,7 @@ import {
 	getFileIcon,
 } from "./tree-scanner.ts";
 import { launchEditor } from "./tree-launchers.ts";
+import { FolderState } from "./folder-state.ts";
 
 /**
  * Interactive Project Tree & Explorer Card for the SOLVI Sidebar.
@@ -33,14 +34,86 @@ export class WorkspaceProjectTreeCard implements Component {
 	private lastScanTime = 0;
 
 	private lastTargetContentLines?: number;
+	private readonly folder: FolderState;
+	private followCursor = false;
 
-	constructor(ctx?: ExtensionContext, tui?: TUI, theme?: Theme, cwd?: string) {
+	constructor(ctx?: ExtensionContext, tui?: TUI, theme?: Theme, cwd?: string, folderState?: FolderState) {
 		this.ctx = ctx;
 		this.tui = tui ?? ({ requestRender: () => {} } as any);
 		this.theme = theme;
 		this.cwd = cwd ?? ctx?.cwd ?? process.cwd();
 		this.expandedDirs = new Set<string>();
+		this.folder = folderState ?? new FolderState();
+		this.folder.cwd = this.cwd;
+		this.folder.tree = {
+			moveCursor: (delta) => this.moveCursor(delta),
+			expandOrOpen: () => this.expandOrOpen(),
+			collapseOrUp: () => this.collapseOrUp(),
+		};
 		this.initDefaultExpanded();
+	}
+
+	private visibleRows() {
+		return flattenVisibleTree(this.getTree(), this.expandedDirs);
+	}
+
+	/** Relative path of the cursor row; defaults to the first visible row. */
+	getCursorPath(): string | undefined {
+		const rows = this.visibleRows();
+		if (rows.length === 0) return undefined;
+		const current = this.folder.cursorPath;
+		if (current !== undefined && rows.some((r) => r.node.relPath === current)) return current;
+		this.folder.cursorPath = rows[0].node.relPath;
+		return this.folder.cursorPath;
+	}
+
+	moveCursor(delta: number): void {
+		const rows = this.visibleRows();
+		if (rows.length === 0) return;
+		const current = this.getCursorPath();
+		const index = Math.max(0, rows.findIndex((r) => r.node.relPath === current));
+		const next = Math.min(rows.length - 1, Math.max(0, index + delta));
+		this.folder.cursorPath = rows[next].node.relPath;
+		this.followCursor = true;
+		this.tui?.requestRender();
+	}
+
+	expandOrOpen(): void {
+		const rows = this.visibleRows();
+		const current = this.getCursorPath();
+		const index = rows.findIndex((r) => r.node.relPath === current);
+		if (index < 0) return;
+		const node = rows[index].node;
+		if (!node.isDirectory) {
+			this.folder.openFile(node.relPath);
+			this.tui?.requestRender();
+			return;
+		}
+		if (!this.expandedDirs.has(node.relPath)) {
+			this.setExpanded(node.relPath, true);
+			return;
+		}
+		const child = rows[index + 1];
+		if (child && child.depth > rows[index].depth) {
+			this.folder.cursorPath = child.node.relPath;
+			this.followCursor = true;
+			this.tui?.requestRender();
+		}
+	}
+
+	collapseOrUp(): void {
+		const current = this.getCursorPath();
+		if (current === undefined) return;
+		if (this.expandedDirs.has(current)) {
+			this.setExpanded(current, false);
+			return;
+		}
+		const parent = path.dirname(current);
+		if (parent && parent !== "." && parent !== current) {
+			this.folder.cursorPath = parent;
+			this.followCursor = true;
+			this.tui?.requestRender();
+		}
 	}
 
 	private initDefaultExpanded(): void {
@@ -54,6 +127,10 @@ export class WorkspaceProjectTreeCard implements Component {
 	invalidate(): void {
 		this.cachedTree = undefined;
 		this.lastScanTime = 0;
+	}
+
+	getCwd(): string {
+		return this.cwd;
 	}
 
 	getHitboxes(): TreeHitbox[] {
@@ -126,6 +203,7 @@ export class WorkspaceProjectTreeCard implements Component {
 				return true;
 			}
 			if (hit.type === "toggle-dir" && hit.node) {
+				this.folder.cursorPath = hit.node.relPath;
 				if (this.expandedDirs.has(hit.node.relPath)) {
 					this.expandedDirs.delete(hit.node.relPath);
 				} else {
@@ -138,6 +216,8 @@ export class WorkspaceProjectTreeCard implements Component {
 			}
 			if (hit.type === "open-file" && hit.node) {
 				this.selectedRelPath = hit.node.relPath;
+				this.folder.cursorPath = hit.node.relPath;
+				this.folder.openFile(hit.node.relPath);
 				launchEditor(hit.node.absPath, this.cwd);
 				this.tui?.requestRender();
 				return true;
@@ -212,13 +292,22 @@ export class WorkspaceProjectTreeCard implements Component {
 
 		this.hitboxes = [];
 
-		const boxLine = (left: string, right = ""): string => {
+		const bg = (s: string): string => {
+			if (!theme) return s;
+			try {
+				return theme.bg("selectedBg", s);
+			} catch {
+				return s;
+			}
+		};
+		const boxLine = (left: string, right = "", isCursor = false): string => {
 			const rightWidth = calcVisibleWidth(right);
 			const maxLeftWidth = Math.max(0, innerWidth - (rightWidth > 0 ? rightWidth + 1 : 0));
 			const truncatedLeft = truncateAnsiAware(left, maxLeftWidth);
 			const leftWidth = calcVisibleWidth(truncatedLeft);
 			const padLen = Math.max(0, innerWidth - leftWidth - rightWidth);
 			const pad = " ".repeat(padLen);
+			if (isCursor) return `${frame(g.v)}${c.pink("›")}${bg(`${truncatedLeft}${pad}${right}`)} ${frame(g.v)}`;
 			return `${frame(g.v)} ${truncatedLeft}${pad}${right} ${frame(g.v)}`;
 		};
 
@@ -317,6 +406,17 @@ export class WorkspaceProjectTreeCard implements Component {
 			this.scrollOffset = maxOffset;
 		}
 
+		const cursorPath = this.getCursorPath();
+		if (this.followCursor) {
+			this.followCursor = false;
+			const cursorIndex = allRows.findIndex((r) => r.node.relPath === cursorPath);
+			if (cursorIndex >= 0) {
+				if (cursorIndex < this.scrollOffset) this.scrollOffset = cursorIndex;
+				else if (cursorIndex >= this.scrollOffset + maxVisibleRows) this.scrollOffset = cursorIndex - maxVisibleRows + 1;
+				if (this.scrollOffset > maxOffset) this.scrollOffset = maxOffset;
+			}
+		}
+
 		const visibleRows = allRows.slice(this.scrollOffset, this.scrollOffset + maxVisibleRows);
 		const lines: string[] = [top];
 
@@ -349,7 +449,7 @@ export class WorkspaceProjectTreeCard implements Component {
 				const countStr = typeof row.node.itemCount === "number" ? c.dim(` (${row.node.itemCount} items)`) : "";
 				const rightBadge = hasDirtyChildren ? c.yellow("●") : "";
 				const content = `${styledPrefix}${folderIcon}${folderName}${countStr}`;
-				lines.push(boxLine(content, rightBadge));
+				lines.push(boxLine(content, rightBadge, row.node.relPath === cursorPath));
 
 				this.hitboxes.push({
 					lineIndex: currentLineIdx,
@@ -391,7 +491,7 @@ export class WorkspaceProjectTreeCard implements Component {
 					? c.pink(bolden(this.theme, row.node.name))
 					: fileColor(row.node.name);
 				const content = `${styledPrefix}${fileIcon}${styledName}`;
-				lines.push(boxLine(content, rightBadge));
+				lines.push(boxLine(content, rightBadge, row.node.relPath === cursorPath));
 
 				this.hitboxes.push({
 					lineIndex: currentLineIdx,
@@ -409,7 +509,7 @@ export class WorkspaceProjectTreeCard implements Component {
 			const infoParts: string[] = [];
 			if (this.scrollOffset > 0) infoParts.push(`▲ ${this.scrollOffset} arriba`);
 			if (remainingBelow > 0) infoParts.push(`▼ ${remainingBelow} abajo`);
-			const scrollIndicator = c.dim(`... ${infoParts.join(" · ")} (wheel scroll)`);
+			const scrollIndicator = c.dim(`... ${infoParts.join(" · ")} (wheel scroll · alt+w/x alt+,/.)`);
 			lines.push(boxLine(scrollIndicator));
 		}
 

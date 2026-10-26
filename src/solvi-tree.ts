@@ -23,3 +23,6 @@ export {
 export {
 	WorkspaceProjectTreeCard,
 } from "./tree/tree-card.ts";
+
+export { WorkspaceFileViewerCard } from "./tree/file-viewer-card.ts";
+export { FolderState, getFolderState } from "./tree/folder-state.ts";

@@ -182,3 +182,6 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 		contextMonitor.stop();
 	});
 }
+import { registerTreeKeys } from "./src/tree/tree-keys.ts";
+	// FLDR tab: Alt+W/X cursor, Alt+. / Alt+, expand/collapse, Alt+PageUp/PageDown scroll the viewer
+	registerTreeKeys(pi);

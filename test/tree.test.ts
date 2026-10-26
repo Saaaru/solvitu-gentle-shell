@@ -428,33 +428,33 @@ test("solvi-tree - resolveSidebarTab resolves '1', 'tree', 'TREE' to projectTree
 	assert.equal(tabByKey.id, "tree");
 	assert.equal(tabByKey.key, "4");
 	assert.equal(tabByKey.label, "FLDR");
-	assert.deepEqual(tabByKey.cards, ["projectTree"]);
+	assert.deepEqual(tabByKey.cards, ["projectTree", "fileViewer"]);
 
 	// Lowercase id resolution
 	const tabById = resolveSidebarTab("tree");
 	assert.equal(tabById.id, "tree");
 	assert.equal(tabById.key, "4");
 	assert.equal(tabById.label, "FLDR");
-	assert.deepEqual(tabById.cards, ["projectTree"]);
+	assert.deepEqual(tabById.cards, ["projectTree", "fileViewer"]);
 
 	// Uppercase id resolution (the id itself, no longer the "TREE" label)
 	const tabByUpper = resolveSidebarTab("TREE");
 	assert.equal(tabByUpper.id, "tree");
 	assert.equal(tabByUpper.key, "4");
 	assert.equal(tabByUpper.label, "FLDR");
-	assert.deepEqual(tabByUpper.cards, ["projectTree"]);
+	assert.deepEqual(tabByUpper.cards, ["projectTree", "fileViewer"]);
 
 	// Aliases
 	const tabByProjectTree = resolveSidebarTab("projecttree");
 	assert.equal(tabByProjectTree.id, "tree");
-	assert.deepEqual(tabByProjectTree.cards, ["projectTree"]);
+	assert.deepEqual(tabByProjectTree.cards, ["projectTree", "fileViewer"]);
 
 	const tabByProjectTreeHyphen = resolveSidebarTab("project-tree");
 	assert.equal(tabByProjectTreeHyphen.id, "tree");
-	assert.deepEqual(tabByProjectTreeHyphen.cards, ["projectTree"]);
+	assert.deepEqual(tabByProjectTreeHyphen.cards, ["projectTree", "fileViewer"]);
 
 	// SIDEBAR_TAB_CARD_MAP
-	assert.deepEqual(SIDEBAR_TAB_CARD_MAP.tree, ["projectTree"]);
+	assert.deepEqual(SIDEBAR_TAB_CARD_MAP.tree, ["projectTree", "fileViewer"]);
 });
 
 

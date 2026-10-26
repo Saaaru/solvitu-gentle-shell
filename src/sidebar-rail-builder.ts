@@ -5,7 +5,7 @@ import { loadSolviLayout } from "./solvi-layout.ts";
 import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
 import { WorkspaceGitGraphCard, WorkspaceWorkingTreeCard, getGitSyncBadge } from "./solvi-git-graph.ts";
 import { WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
-import { WorkspaceProjectTreeCard } from "./solvi-tree.ts";
+import { WorkspaceProjectTreeCard, WorkspaceFileViewerCard, getFolderState } from "./solvi-tree.ts";
 import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
 import { WorkspaceSolviTabCard } from "./solvi-tab.ts";
 import { WorkspaceModelsCard } from "./models/models-card.ts";
@@ -150,9 +150,13 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 			if (!component && (key === "projectTree" || key === "project-tree")) {
 				component = state.parts.get("projectTree") || state.parts.get("project-tree");
 				if (!component) {
-					component = new WorkspaceProjectTreeCard(undefined as any, tui, theme);
+					component = new WorkspaceProjectTreeCard(undefined as any, tui, theme, undefined, getFolderState(tui));
 					state.parts.set("projectTree", component);
 				}
+			}
+			if (!component && key === "fileViewer") {
+				component = new WorkspaceFileViewerCard(getFolderState(tui), theme);
+				state.parts.set("fileViewer", component);
 			}
 			if (
 				!component &&
@@ -212,6 +216,7 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 				key !== "persistent-memory" &&
 				key !== "projectTree" &&
 				key !== "project-tree" &&
+				key !== "fileViewer" &&
 				key !== "solviTab" &&
 				key !== "solvi-tab" &&
 				key !== "yt" &&
