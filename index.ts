@@ -35,13 +35,13 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 		host.registerToolRenderer((toolName, next) => (COMPACT_TOOLS.has(toolName) ? compactToolRenderer(toolName) : next()));
 	}
 
-	// Alt+Left / Alt+Right move between sidebar tabs
+	// Alt+H / Alt+L move between sidebar tabs; Alt+Left / Alt+Right do the same (see src/sidebar-arrow-keys.ts)
 	const cycleTab = (delta: number) => {
 		const tui = footerRegistry.latestTodoTui;
 		if (tui?.terminal) cycleSidebarTab(tui, delta);
 	};
-	pi.registerShortcut("alt+left", { description: "Previous sidebar tab", handler: () => cycleTab(-1) });
-	pi.registerShortcut("alt+right", { description: "Next sidebar tab", handler: () => cycleTab(1) });
+	pi.registerShortcut("alt+h", { description: "Previous sidebar tab", handler: () => cycleTab(-1) });
+	pi.registerShortcut("alt+l", { description: "Next sidebar tab", handler: () => cycleTab(1) });
 	// SKILLS tab: Alt+M / Alt+N select a skill or MCP server, Alt+O reads it in the viewer below
 	pi.registerShortcut("alt+m", { description: "Previous skill or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, -1) });
 	pi.registerShortcut("alt+n", { description: "Next skill or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, 1) });
