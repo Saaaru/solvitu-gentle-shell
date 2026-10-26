@@ -26,7 +26,7 @@ Album cover rendering, queue, volume, search, playlists, audio streaming.
 - Tests must not call the real Spotify API.
 
 ## Tasks
-- [ ] S1 Auth, token store, API client and `/spotify` commands: `src/spotify/*` (PKCE + loopback callback server, browser opener safe on Windows, token store with refresh, client with 401 refresh, 429 Retry-After, typed errors for not-connected, premium-required, no-device, network), commands registered from `index.ts` (add-only lines). Route: delegated writer.
+- [x] S1 (evidence: RED = 3 suites `ERR_MODULE_NOT_FOUND`; GREEN = `npm test` 191 pass / 2 pre-existing fail of 193, parent re-ran; 29 new tests with injected fetch, no real network; only 2 lines added to `index.ts`, staged from a HEAD-based blob; agent dir via `resolveAgentDir()` because the launcher sets `PI_CODING_AGENT_DIR`; Windows opener = `rundll32 url.dll,FileProtocolHandler`; untested against the real Spotify API) Auth, token store, API client and `/spotify` commands: `src/spotify/*` (PKCE + loopback callback server, browser opener safe on Windows, token store with refresh, client with 401 refresh, 429 Retry-After, typed errors for not-connected, premium-required, no-device, network), commands registered from `index.ts` (add-only lines). Route: delegated writer.
 - [ ] S2 Now-playing state and UI: poller with dispose and backoff, ASCII renderer (progress, equalizer, controls, error/help states), rewrite `src/solvi-tab/solvi-tab-card.ts` and `test/solvi-tab.test.ts`, remove YouTube-only types. Route: delegated writer, after S1.
 - [ ] S3 Live verification with the user's Client ID (login, now playing, each control).
 
@@ -41,4 +41,4 @@ Album cover rendering, queue, volume, search, playlists, audio streaming.
 - Exploration done (Solvi card, wiring, commands API, config dirs, image libs, test patterns).
 
 ## Next step
-S1.
+S2 (UI on top of `getSpotifyClient()` from `src/spotify/spotify-commands.ts`).

@@ -5,6 +5,7 @@ import { cycleSidebarTab, resolveSidebarTab } from "./src/sidebar-tabs.ts";
 import { footerRegistry } from "./src/footer/footer-registry.ts";
 import { moveSelection, openSelected } from "./src/main-view.ts";
 import { registerTreeKeys } from "./src/tree/tree-keys.ts";
+import { registerSpotifyCommands } from "./src/spotify/spotify-commands.ts";
 import { syncProjectCloud, detectProjectName } from "./src/solvi-engram.ts";
 import { SolviContextMonitor } from "./src/solvi-context-monitor.ts";
 import { installWelcomeBanner } from "./src/welcome.ts";
@@ -77,6 +78,7 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	pi.registerShortcut("alt+j", { description: "Scroll active tab down", handler: () => scrollActiveTab(1) });
 	// FLDR tab: Alt+C/X cursor, Alt+. / Alt+, expand/collapse, Alt+PageUp/PageDown scroll the viewer
 	registerTreeKeys(pi);
+	registerSpotifyCommands(pi);
 
 	// Shows the bee until the first message, then hands the header slot to installWorkspaceHeader.
 	installWelcomeBanner(pi);
