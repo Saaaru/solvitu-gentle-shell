@@ -18,7 +18,7 @@ Rework the Solvitu sidebar tabs: MEM becomes the first tab `1:STACK` (Stack box 
 
 ## Tasks
 - [x] T1 Tab reorder and relabel (mem -> `1:STACK`, tree -> `4:FLDR`, STACK cards = ecosystem only for now; `models` joins in T2). Tests first: `test/sidebar.test.ts`, `test/tree.test.ts`, `test/engram.test.ts`, `test/ecosystem-card.test.ts`. Route: inline (2 non-trivial files? no: one source file, tests-led edits). Evidence: RED = 3 failures after test edits, GREEN = `npm test` 142 pass / 2 pre-existing fail (same two as baseline). Aliases added: `main`, `folder` -> tree.
-- [ ] T2 Models card: new `src/models/` card + per-model reducer + `enabledModels` resolver, registered in `src/footer.ts`, added to the STACK card map. Route: delegated writer.
+- [x] T2 Models card: new `src/models/` card + per-model reducer, registered in `src/footer.ts`, added to the STACK card map. Route: delegated writer (2+ new non-trivial files). Evidence: RED 141/145 pass; GREEN `npm test` 150 pass / 2 pre-existing fail of 152 (parent re-ran). Scope source: `ctx.scopedModels` (same set as `/scoped-models`), fallback to `enabledModels` setting, then first 6 available. Real per model: context window, session tokens and cost. Active model only: context usage and quota (quota matched by account prefix). Not visually checked in a TUI.
 - [ ] T3 FLDR split: tree card at 50% height, new file-viewer card, keyboard cursor/open/scroll via shortcuts in `index.ts`. Route: delegated writer.
 - [x] T5 (added mid-feature at user request) Two new Pi themes `Claude-Dark` and `Claude-Light` in `themes/`, same var/role keys as `Workspace.json`, palette from Anthropic brand colors (orange `#D97757`, cream `#FAF9F5`, blue `#6A9BCC`, green `#788C5D`). Route: inline (generated JSON, one script). Evidence: 43 vars / 53 color roles each, 0 unresolved role references. Pending: user visual check; exact Claude Code hex values were not available.
 - [ ] T4 Verification: `npm test`, launch `gentle-shell`, visual check by the user.
@@ -37,4 +37,4 @@ Alt+Up/Down move the tree cursor, Alt+Right expands/opens, Alt+Left collapses, A
 - Exploration done (sidebar-tabs.ts, ecosystem/engram/tree cards, usage/context helpers).
 
 ## Next step
-T2 (Models card, delegated writer).
+T3 (FLDR split, delegated writer).

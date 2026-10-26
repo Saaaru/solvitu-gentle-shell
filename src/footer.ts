@@ -9,6 +9,7 @@ import { WorkspaceTodoMirror } from "./todos.ts";
 import { WorkspaceGitGraphCard, WorkspaceWorkingTreeCard } from "./solvi-git-graph.ts";
 import { WorkspaceToolsCard } from "./solvi-tools.ts";
 import { WorkspaceEcosystemCard } from "./ecosystem/ecosystem-card.ts";
+import { WorkspaceModelsCard } from "./models/models-card.ts";
 import { WorkspaceEngramCard, WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
 import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
 import { tuneTuiScroll } from "./solvi-layout.ts";
@@ -93,6 +94,7 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 		const workingTree = new WorkspaceWorkingTreeCard(ctx, tui, theme);
 		const toolsCard = new WorkspaceToolsCard(ctx, tui, theme);
 		const ecosystemCard = new WorkspaceEcosystemCard(ctx, tui, theme);
+		const modelsCard = new WorkspaceModelsCard(ctx, tui, theme);
 		const todos = new WorkspaceTodoMirror(ctx, tui, theme);
 
 		footerRegistry.latestTodoTui = tui;
@@ -170,6 +172,11 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 			invalidate: () => ecosystemCard.invalidate(),
 			handleRailClick: (lineIndex: number, button?: string) => ecosystemCard.handleClick(lineIndex, button),
 		};
+		const modelsRail = {
+			render: (width: number) => modelsCard.render(width),
+			invalidate: () => modelsCard.invalidate(),
+			handleRailClick: (lineIndex: number, button?: string) => modelsCard.handleClick(lineIndex, button),
+		};
 		const profilesCard = new WorkspaceProfilesExtendedCard(tui, theme, undefined, ctx, pi);
 		footerRegistry.latestProfilesCard = profilesCard;
 		const profilesRail = {
@@ -199,6 +206,7 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 		const workingTreePart = sidebarPart(tui, "workingTree", { render: () => [] }, workingTreeRail);
 		const toolsPart = sidebarPart(tui, "tools", { render: () => [] }, toolsRail);
 		const ecosystemPart = sidebarPart(tui, "ecosystem", { render: () => [] }, ecosystemRail);
+		const modelsPart = sidebarPart(tui, "models", { render: () => [] }, modelsRail);
 		const profilesPart = sidebarPart(tui, "solvi-profiles", { render: () => [] }, profilesRail);
 		const projectTreePart = sidebarPart(tui, "projectTree", { render: () => [] }, projectTreeRail);
 		const solviTabCard = new WorkspaceSolviTabCard(tui, theme, ctx);
@@ -232,6 +240,7 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 				part.dispose?.();
 				contextPart.dispose?.();
 				ecosystemPart.dispose?.();
+				modelsPart.dispose?.();
 				engramPart.dispose?.();
 				engramHandoffPart.dispose?.();
 				persistentMemoryPart.dispose?.();

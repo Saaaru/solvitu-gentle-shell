@@ -15,7 +15,7 @@ export const SIDEBAR_TAB_CARD_MAP: Record<string, string[]> = {
 	skills: ["main-list", "main-viewer"],
 	git: ["gitGraph", "workingTree", "todo"],
 	prof: ["solvi-profiles"],
-	mem: ["ecosystem"],
+	mem: ["ecosystem", "models"],
 	tree: ["projectTree"],
 	solvi: ["solviTab"],
 };

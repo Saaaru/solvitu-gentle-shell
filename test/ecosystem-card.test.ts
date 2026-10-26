@@ -107,7 +107,7 @@ test("ecosystem-card - WorkspaceEcosystemCard renders within bounds without widt
 });
 
 test("sidebar tabs - STACK tab includes ecosystem card", () => {
-	assert.ok(SIDEBAR_TAB_CARD_MAP.mem.includes("ecosystem"));
+	assert.deepEqual(SIDEBAR_TAB_CARD_MAP.mem, ["ecosystem", "models"]);
 	const memTab = resolveSidebarTab("stack");
 	assert.equal(memTab.id, "mem");
 	assert.equal(memTab.label, "STACK");

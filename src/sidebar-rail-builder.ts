@@ -8,6 +8,7 @@ import { WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
 import { WorkspaceProjectTreeCard } from "./solvi-tree.ts";
 import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
 import { WorkspaceSolviTabCard } from "./solvi-tab.ts";
+import { WorkspaceModelsCard } from "./models/models-card.ts";
 import { measureDockMetrics } from "./sidebar-dock.ts";
 import { renderSolviSidebarBanner } from "./sidebar-state.ts";
 import {
@@ -171,6 +172,14 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 					state.parts.set("memoryGraph", component);
 				}
 			}
+			if (!component && key === "models") {
+				component = new WorkspaceModelsCard(
+					((tui as any)?.__solviCtx ?? { scopedModels: [], sessionManager: { getEntries: () => [] } }) as any,
+					tui,
+					theme,
+				);
+				state.parts.set("models", component);
+			}
 			if (!component && (key === "solviTab" || key === "solvi-tab" || key === "yt")) {
 				component = state.parts.get("solviTab") || state.parts.get("solvi-tab") || state.parts.get("yt");
 				if (!component) {
@@ -205,7 +214,8 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 				key !== "project-tree" &&
 				key !== "solviTab" &&
 				key !== "solvi-tab" &&
-				key !== "yt"
+				key !== "yt" &&
+				key !== "models"
 					? rawLines.map((line) => unifySidebarCardFrame(line, theme))
 					: rawLines;
 			return { key, component, lines };
