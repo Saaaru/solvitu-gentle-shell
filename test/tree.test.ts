@@ -424,24 +424,24 @@ test("solvi-tree - full-height behavior when terminal rows is set", () => {
 
 test("solvi-tree - resolveSidebarTab resolves '1', 'tree', 'TREE' to projectTree", () => {
 	// Key resolution
-	const tabByKey = resolveSidebarTab("1");
+	const tabByKey = resolveSidebarTab("4");
 	assert.equal(tabByKey.id, "tree");
-	assert.equal(tabByKey.key, "1");
-	assert.equal(tabByKey.label, "MAIN");
+	assert.equal(tabByKey.key, "4");
+	assert.equal(tabByKey.label, "FLDR");
 	assert.deepEqual(tabByKey.cards, ["projectTree"]);
 
 	// Lowercase id resolution
 	const tabById = resolveSidebarTab("tree");
 	assert.equal(tabById.id, "tree");
-	assert.equal(tabById.key, "1");
-	assert.equal(tabById.label, "MAIN");
+	assert.equal(tabById.key, "4");
+	assert.equal(tabById.label, "FLDR");
 	assert.deepEqual(tabById.cards, ["projectTree"]);
 
 	// Uppercase id resolution (the id itself, no longer the "TREE" label)
 	const tabByUpper = resolveSidebarTab("TREE");
 	assert.equal(tabByUpper.id, "tree");
-	assert.equal(tabByUpper.key, "1");
-	assert.equal(tabByUpper.label, "MAIN");
+	assert.equal(tabByUpper.key, "4");
+	assert.equal(tabByUpper.label, "FLDR");
 	assert.deepEqual(tabByUpper.cards, ["projectTree"]);
 
 	// Aliases

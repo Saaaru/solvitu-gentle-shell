@@ -71,11 +71,11 @@ test("sidebar tabs - renderSolviSidebarTabBar generates expected tabs, non-empty
 	assert.equal(visibleWidth(unthemedBar.line), 50);
 	assert.equal(visibleWidth(unthemedBar.divider), 50);
 
-	// Generates bar with expected tabs: 1:MAIN, 2:GIT, 3:PROF, 4:MEM, 5:SKILLS, 6:YT
-	assert.ok(unthemedBar.line.includes("1:MAIN"));
+	// Generates bar with expected tabs: 1:STACK, 2:GIT, 3:PROF, 4:FLDR, 5:SKILLS, 6:Solvi
+	assert.ok(unthemedBar.line.includes("1:STACK"));
 	assert.ok(unthemedBar.line.includes("2:GIT"));
 	assert.ok(unthemedBar.line.includes("3:PROF"));
-	assert.ok(unthemedBar.line.includes("4:MEM"));
+	assert.ok(unthemedBar.line.includes("4:FLDR"));
 	assert.ok(unthemedBar.line.includes("5:SKILLS"));
 
 	// Non-empty hitboxes for canonical tabs
@@ -117,12 +117,18 @@ test("sidebar tabs - renderSolviSidebarTabBar generates expected tabs, non-empty
 });
 
 test("sidebar tabs - resolveSidebarTab resolves by id and by key", () => {
-	// Resolves by key ("1" -> "tree", "2" -> "git", "3" -> "prof", etc.)
-	assert.equal(resolveSidebarTab("1").id, "tree");
+	// Resolves by key ("1" -> "mem", "2" -> "git", "3" -> "prof", "4" -> "tree", etc.)
+	assert.equal(resolveSidebarTab("1").id, "mem");
 	assert.equal(resolveSidebarTab("2").id, "git");
 	assert.equal(resolveSidebarTab("3").id, "prof");
-	assert.equal(resolveSidebarTab("3").id, "prof");
+	assert.equal(resolveSidebarTab("4").id, "tree");
 	assert.equal(resolveSidebarTab("5").id, "skills");
+
+	// New labels and the legacy "main" alias
+	assert.equal(resolveSidebarTab("stack").id, "mem");
+	assert.equal(resolveSidebarTab("STACK").id, "mem");
+	assert.equal(resolveSidebarTab("fldr").id, "tree");
+	assert.equal(resolveSidebarTab("main").id, "tree", "legacy MAIN label should alias to the folder tab");
 
 	// Resolves by id and backward-compatible aliases
 	assert.equal(resolveSidebarTab("git").id, "git");
@@ -133,7 +139,7 @@ test("sidebar tabs - resolveSidebarTab resolves by id and by key", () => {
 	assert.equal(resolveSidebarTab("forge").id, "prof", "forge should be backward compatible alias for prof");
 	assert.equal(resolveSidebarTab("mem").id, "mem");
 	assert.equal(resolveSidebarTab("tree").id, "tree");
-	assert.equal(resolveSidebarTab("0").id, "tree", "legacy 0/all tab should safely fall back to the default (first) tab");
+	assert.equal(resolveSidebarTab("0").id, "mem", "legacy 0/all tab should safely fall back to the default (first) tab");
 
 	// SIDEBAR_TAB_CARD_MAP checks - clean canonical 5 tabs
 	assert.ok(SIDEBAR_TAB_CARD_MAP.prof.includes("solvi-profiles"), "SIDEBAR_TAB_CARD_MAP.prof must include solvi-profiles");
@@ -142,9 +148,9 @@ test("sidebar tabs - resolveSidebarTab resolves by id and by key", () => {
 	assert.equal(SIDEBAR_TAB_CARD_MAP.usage, undefined, "legacy usage should be pruned from map");
 
 	// Fallback to the default (first) tab on undefined or invalid
-	assert.equal(resolveSidebarTab(undefined).id, "tree");
-	assert.equal(resolveSidebarTab("").id, "tree");
-	assert.equal(resolveSidebarTab("invalid").id, "tree");
+	assert.equal(resolveSidebarTab(undefined).id, "mem");
+	assert.equal(resolveSidebarTab("").id, "mem");
+	assert.equal(resolveSidebarTab("invalid").id, "mem");
 
 	// Tab properties (canonical tabs: tree, git, prof, mem, skills, yt)
 	assert.ok(SOLVI_SIDEBAR_TABS.length >= 5, "SOLVI_SIDEBAR_TABS must contain at least 5 canonical tabs");
@@ -211,8 +217,8 @@ test("sidebar tabs - mock TUI tab switching via click and wheel cycling", () => 
 		assert.ok(scrollEntry, "ScrollView component must be mounted");
 		const scroll = scrollEntry.component;
 
-		// Initial tab should resolve to defaultTab ("1" -> "tree")
-		assert.equal(state.activeTabId, "tree");
+		// Initial tab should resolve to defaultTab ("1" -> "mem", shown as STACK)
+		assert.equal(state.activeTabId, "mem");
 
 		const layout = loadSolviLayout().sidebar;
 		const netWidth = layout.railWidth - 2 * layout.railPadding;
@@ -256,14 +262,14 @@ test("sidebar tabs - mock TUI tab switching via click and wheel cycling", () => 
 		});
 		assert.equal(state.activeTabId, "git", "Wheel delta -1 should cycle tab back to git");
 
-		// Wheel backward again -> from git (index 1) to tree (index 0, the first tab)
+		// Wheel backward again -> from git (index 1) to mem (index 0, the first tab)
 		scroll.handleMouse({
 			type: "wheel",
 			wheelDelta: -1,
 			x: 10,
 			y: 3,
 		});
-		assert.equal(state.activeTabId, "tree", "Wheel delta -1 should cycle back to the first tab (tree)");
+		assert.equal(state.activeTabId, "mem", "Wheel delta -1 should cycle back to the first tab (mem/STACK)");
 
 		// Wheel backward from tree (first tab) wraps around to the last tab (yt)
 		const lastTab = SOLVI_SIDEBAR_TABS[SOLVI_SIDEBAR_TABS.length - 1];

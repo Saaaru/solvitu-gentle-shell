@@ -15,16 +15,16 @@ export const SIDEBAR_TAB_CARD_MAP: Record<string, string[]> = {
 	skills: ["main-list", "main-viewer"],
 	git: ["gitGraph", "workingTree", "todo"],
 	prof: ["solvi-profiles"],
-	mem: ["engram", "engramHandoff", "persistentMemory", "ecosystem", "tools"],
+	mem: ["ecosystem"],
 	tree: ["projectTree"],
 	solvi: ["solviTab"],
 };
 
 export const SOLVI_SIDEBAR_TABS: readonly SolviSidebarTab[] = [
-	{ id: "tree", key: "1", label: "MAIN", title: "Project Tree & Explorer", cards: SIDEBAR_TAB_CARD_MAP.tree },
+	{ id: "mem", key: "1", label: "STACK", title: "Stack & Models", cards: SIDEBAR_TAB_CARD_MAP.mem },
 	{ id: "git", key: "2", label: "GIT", title: "Git Graph & Working Tree", cards: SIDEBAR_TAB_CARD_MAP.git },
 	{ id: "prof", key: "3", label: "PROF", title: "Profiles & Clusters", cards: SIDEBAR_TAB_CARD_MAP.prof },
-	{ id: "mem", key: "4", label: "MEM", title: "Memory & Tools", cards: SIDEBAR_TAB_CARD_MAP.mem },
+	{ id: "tree", key: "4", label: "FLDR", title: "Folder Explorer", cards: SIDEBAR_TAB_CARD_MAP.tree },
 	{ id: "skills", key: "5", label: "SKILLS", title: "Skills & MCP", cards: SIDEBAR_TAB_CARD_MAP.skills },
 	{ id: "solvi", key: "6", label: "Solvi", title: "Solvi", cards: SIDEBAR_TAB_CARD_MAP.solvi },
 ];
@@ -33,7 +33,7 @@ export function resolveSidebarTab(tabIdOrKey?: string): SolviSidebarTab {
 	if (tabIdOrKey) {
 		let normalized = tabIdOrKey.toLowerCase();
 		if (normalized === "forge" || normalized === "agents" || normalized === "usage") normalized = "prof";
-		if (normalized === "projecttree" || normalized === "project-tree") normalized = "tree";
+		if (normalized === "projecttree" || normalized === "project-tree" || normalized === "main" || normalized === "folder") normalized = "tree";
 		const match = SOLVI_SIDEBAR_TABS.find(
 			(t) => t.id === normalized || t.key === normalized || t.label.toLowerCase() === normalized
 		);

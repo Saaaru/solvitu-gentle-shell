@@ -1,0 +1,39 @@
+# stack-models-fldr-tabs
+
+## Objective
+Rework the Solvitu sidebar tabs: MEM becomes the first tab `1:STACK` (Stack box + new Models box), and the old `1:MAIN` project tree becomes `4:FLDR` with a 50/50 split (tree + keyboard-navigable file viewer).
+
+## Scope (authorized by the user)
+- Tab order/labels: `1:STACK` (id `mem`), `2:GIT`, `3:PROF`, `4:FLDR` (id `tree`), `5:SKILLS`, `6:Solvi`.
+- STACK tab keeps only the Stack (ecosystem) card. The "Active Handoff" card is removed from it and replaced by a "Models" card. The other former MEM cards (engram, persistentMemory, tools) are removed from the tab map only; their code stays.
+- Models card lists the scoped models (Pi `enabledModels` setting, same set as `/scoped-models`) with context window, session tokens/cost and quota where resolvable.
+- FLDR: tree uses 50% of the column height, the other 50% previews the selected file; selection and scrolling must work from the keyboard.
+
+## Constraints
+- Cards are `Component`s (`render(width,height) => string[]`), see `src/sidebar-rail-builder.ts`.
+- No keyboard model exists for the tree today; keyboard goes through Pi shortcuts registered in `index.ts`.
+- Uncommitted user edits exist in `index.ts` and `src/main-view.ts`; do not include them in work-unit commits unless a task needs the file.
+- Baseline before changes: `npm test` = 142 pass, 2 fail (pre-existing: `solvi-engram ... WorkspaceEngramCard`, `solvi-tree ... Header must include nvim editor button`).
+- Planning heuristic ~400 authored changed lines per task (advisory).
+
+## Tasks
+- [x] T1 Tab reorder and relabel (mem -> `1:STACK`, tree -> `4:FLDR`, STACK cards = ecosystem only for now; `models` joins in T2). Tests first: `test/sidebar.test.ts`, `test/tree.test.ts`, `test/engram.test.ts`, `test/ecosystem-card.test.ts`. Route: inline (2 non-trivial files? no: one source file, tests-led edits). Evidence: RED = 3 failures after test edits, GREEN = `npm test` 142 pass / 2 pre-existing fail (same two as baseline). Aliases added: `main`, `folder` -> tree.
+- [ ] T2 Models card: new `src/models/` card + per-model reducer + `enabledModels` resolver, registered in `src/footer.ts`, added to the STACK card map. Route: delegated writer.
+- [ ] T3 FLDR split: tree card at 50% height, new file-viewer card, keyboard cursor/open/scroll via shortcuts in `index.ts`. Route: delegated writer.
+- [ ] T4 Verification: `npm test`, launch `gentle-shell`, visual check by the user.
+
+## Keyboard design (default, user may change)
+Alt+Up/Down move the tree cursor, Alt+Right expands/opens, Alt+Left collapses, Alt+PageUp/PageDown scroll the viewer. Existing Alt+H/L (tabs) and Alt+I/J (rail scroll) stay.
+
+## Acceptance
+- Tab bar reads `1:STACK 2:GIT 3:PROF 4:FLDR 5:SKILLS 6:Solvi`.
+- STACK shows Stack box then Models box; no Active Handoff.
+- FLDR shows tree (top half) and preview (bottom half); keyboard moves selection and updates the preview.
+- `npm test`: no new failures vs. baseline.
+
+## Progress
+- Branch `feat/stack-models-fldr-tabs` created from `main`.
+- Exploration done (sidebar-tabs.ts, ecosystem/engram/tree cards, usage/context helpers).
+
+## Next step
+T2 (Models card, delegated writer).

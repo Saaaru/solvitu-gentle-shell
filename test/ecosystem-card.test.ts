@@ -106,9 +106,11 @@ test("ecosystem-card - WorkspaceEcosystemCard renders within bounds without widt
 	assert.ok(expandedText.includes("instalado"));
 });
 
-test("sidebar tabs - MEM tab includes ecosystem card", () => {
+test("sidebar tabs - STACK tab includes ecosystem card", () => {
 	assert.ok(SIDEBAR_TAB_CARD_MAP.mem.includes("ecosystem"));
-	const memTab = resolveSidebarTab("mem");
+	const memTab = resolveSidebarTab("stack");
+	assert.equal(memTab.id, "mem");
+	assert.equal(memTab.label, "STACK");
 	assert.ok(memTab.cards.includes("ecosystem"));
 });
 

@@ -134,11 +134,8 @@ Found 1 memories:
 
 	// Tab mappings check
 	assert.ok(SIDEBAR_TAB_CARD_MAP.git.includes("workingTree"), "git tab must include workingTree");
-	assert.ok(SIDEBAR_TAB_CARD_MAP.mem.includes("engramHandoff"), "mem tab must include engramHandoff");
-	assert.ok(
-		SIDEBAR_TAB_CARD_MAP.mem.includes("persistentMemory") || SIDEBAR_TAB_CARD_MAP.mem.includes("memoryGraph"),
-		"mem tab must include persistentMemory or memoryGraph",
-	);
+	assert.ok(!SIDEBAR_TAB_CARD_MAP.mem.includes("engramHandoff"), "STACK tab must not include the Active Handoff card");
+	assert.ok(!SIDEBAR_TAB_CARD_MAP.mem.includes("persistentMemory"), "STACK tab keeps only the stack and models cards");
 });
 
 test("solvi-memory-graph - candidate resolution, stats querying and card rendering", async () => {
