@@ -24,7 +24,7 @@ Rework the Solvitu sidebar tabs: MEM becomes the first tab `1:STACK` (Stack box 
 - [ ] T4 Verification: `npm test`, launch `gentle-shell`, visual check by the user.
 
 ## Keyboard design (as implemented)
-Pi reserves Alt+Arrow keys (`keybindings.md`: models reorder, message dequeue, tree fold, word movement), so the planned bindings were replaced: Alt+W / Alt+X move the tree cursor, Alt+. expands a directory or opens the file, Alt+, collapses or goes to the parent, Alt+PageUp / Alt+PageDown scroll the viewer. All inert unless the active tab is FLDR. Existing Alt+H/L (tabs) and Alt+I/J (rail scroll) stay.
+Pi reserves Alt+Arrow keys (`keybindings.md`: models reorder, message dequeue, tree fold, word movement), so the planned bindings were replaced: Alt+C / Alt+X move the tree cursor (Alt+W was first chosen but collides with the `pi-btw` extension, found at launch), Alt+. expands a directory or opens the file, Alt+, collapses or goes to the parent, Alt+PageUp / Alt+PageDown scroll the viewer. All inert unless the active tab is FLDR. Existing Alt+H/L (tabs) and Alt+I/J (rail scroll) stay.
 
 ## Acceptance
 - Tab bar reads `1:STACK 2:GIT 3:PROF 4:FLDR 5:SKILLS 6:Solvi`.

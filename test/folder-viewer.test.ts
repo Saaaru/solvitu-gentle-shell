@@ -83,7 +83,7 @@ test("folder tree - renders a cursor marker, keeps it visible and mouse click pr
 		assert.ok(moved.some((l) => l.includes("›") && l.includes("file30.txt")), "window follows the cursor");
 		assert.equal(moved.length, 12);
 		const wide = card.render(90, 12).map(strip).join("\n");
-		assert.ok(wide.includes("wheel scroll") && wide.includes("alt+w/x"), "footer hint mentions wheel and keys");
+		assert.ok(wide.includes("wheel scroll") && wide.includes("alt+c/x"), "footer hint mentions wheel and keys");
 
 		const hit = card.getHitboxes().find((h) => h.type === "open-file" && h.node?.name === "file30.txt");
 		assert.ok(hit, "hitbox for the cursor file");
@@ -227,7 +227,7 @@ test("folder keys - act only on the FLDR tab and re-render", () => {
 	try {
 		const shortcuts = new Map<string, () => void>();
 		registerTreeKeys({ registerShortcut: (id: string, opts: any) => shortcuts.set(id, opts.handler) } as any);
-		assert.deepEqual([...shortcuts.keys()].sort(), ["alt+,", "alt+.", "alt+pagedown", "alt+pageup", "alt+w", "alt+x"].sort());
+		assert.deepEqual([...shortcuts.keys()].sort(), ["alt+,", "alt+.", "alt+pagedown", "alt+pageup", "alt+c", "alt+x"].sort());
 
 		let renders = 0;
 		const tui: any = { terminal: { columns: 160, rows: 50 }, requestRender: () => renders++ };
@@ -244,7 +244,7 @@ test("folder keys - act only on the FLDR tab and re-render", () => {
 		sidebarState(tui).activeTabId = "tree";
 		shortcuts.get("alt+x")!();
 		assert.equal(folder.cursorPath, "d");
-		shortcuts.get("alt+w")!();
+		shortcuts.get("alt+c")!();
 		assert.equal(folder.cursorPath, "a");
 		shortcuts.get("alt+.")!();
 		assert.ok(card.getExpandedDirs().has("a"));

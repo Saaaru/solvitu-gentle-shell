@@ -509,7 +509,7 @@ export class WorkspaceProjectTreeCard implements Component {
 			const infoParts: string[] = [];
 			if (this.scrollOffset > 0) infoParts.push(`▲ ${this.scrollOffset} arriba`);
 			if (remainingBelow > 0) infoParts.push(`▼ ${remainingBelow} abajo`);
-			const scrollIndicator = c.dim(`... ${infoParts.join(" · ")} (wheel scroll · alt+w/x alt+,/.)`);
+			const scrollIndicator = c.dim(`... ${infoParts.join(" · ")} (wheel scroll · alt+c/x alt+,/.)`);
 			lines.push(boxLine(scrollIndicator));
 		}
 
