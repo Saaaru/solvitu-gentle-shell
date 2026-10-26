@@ -27,7 +27,7 @@ Album cover rendering, queue, volume, search, playlists, audio streaming.
 
 ## Tasks
 - [x] S1 (evidence: RED = 3 suites `ERR_MODULE_NOT_FOUND`; GREEN = `npm test` 191 pass / 2 pre-existing fail of 193, parent re-ran; 29 new tests with injected fetch, no real network; only 2 lines added to `index.ts`, staged from a HEAD-based blob; agent dir via `resolveAgentDir()` because the launcher sets `PI_CODING_AGENT_DIR`; Windows opener = `rundll32 url.dll,FileProtocolHandler`; untested against the real Spotify API) Auth, token store, API client and `/spotify` commands: `src/spotify/*` (PKCE + loopback callback server, browser opener safe on Windows, token store with refresh, client with 401 refresh, 429 Retry-After, typed errors for not-connected, premium-required, no-device, network), commands registered from `index.ts` (add-only lines). Route: delegated writer.
-- [ ] S2 Now-playing state and UI: poller with dispose and backoff, ASCII renderer (progress, equalizer, controls, error/help states), rewrite `src/solvi-tab/solvi-tab-card.ts` and `test/solvi-tab.test.ts`, remove YouTube-only types. Route: delegated writer, after S1.
+- [x] S2 (evidence: RED = 202 tests / 9 fail; GREEN = `npm test` 217 pass / 2 pre-existing fail of 219, parent re-ran; poller gated by render visibility, 2 s playing / 5 s otherwise, backoff to 30 s, 250 ms ticker; click `x` uses the same `event.x - railPadding` convention as the other cards; `YouTubePlayerState`/`YouTubeTrack` types kept because `solvi-tab-cover.ts` imports them; not run against real Spotify or the real TUI) Now-playing state and UI: poller with dispose and backoff, ASCII renderer (progress, equalizer, controls, error/help states), rewrite `src/solvi-tab/solvi-tab-card.ts` and `test/solvi-tab.test.ts`, remove YouTube-only types. Route: delegated writer, after S1.
 - [ ] S3 Live verification with the user's Client ID (login, now playing, each control).
 
 ## Acceptance
@@ -41,4 +41,4 @@ Album cover rendering, queue, volume, search, playlists, audio streaming.
 - Exploration done (Solvi card, wiring, commands API, config dirs, image libs, test patterns).
 
 ## Next step
-S2 (UI on top of `getSpotifyClient()` from `src/spotify/spotify-commands.ts`).
+S3: the user creates the Spotify app (Client ID, redirect `http://127.0.0.1:8888/callback`), then `/spotify client <id>`, `/spotify login`, and checks `6:Solvi` live.
