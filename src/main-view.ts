@@ -2,12 +2,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, type Component, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 // MAIN tab: active skills and MCP servers on top, a read-only viewer on the bottom half.
 
 export interface MainItem {
-	kind: "skill" | "mcp";
+	kind: "skill" | "prompt" | "extension" | "mcp";
 	group: string;
 	name: string;
 	description?: string;
@@ -67,6 +67,33 @@ export function collectItems(pi: ExtensionAPI): MainItem[] {
 			path: info.path,
 		});
 	}
+	const seenExtensions = new Set<string>();
+	const addExtension = (info: any) => {
+		const path = String(info?.path ?? "");
+		if (!path || path.startsWith("builtin:") || seenExtensions.has(path)) return;
+		seenExtensions.add(path);
+		items.push({
+			kind: "extension",
+			group: `${info.scope ?? "user"} · extensions`,
+			name: String(info.source ?? basename(path)).replace(/^npm:/, ""),
+			path,
+		});
+	};
+	for (const command of commands) {
+		if (command.source === "prompt") {
+			const info = command.sourceInfo ?? {};
+			items.push({
+				kind: "prompt",
+				group: `${info.scope ?? "user"} · prompts`,
+				name: `/${String(command.name).replace(/^\//, "")}`,
+				description: command.description,
+				path: info.path,
+			});
+		} else if (command.source === "extension") {
+			addExtension(command.sourceInfo);
+		}
+	}
+	for (const tool of (pi as any).getAllTools?.() ?? []) addExtension(tool.sourceInfo);
 	const servers = (pi as any).getMcpServers?.() ?? [];
 	for (const server of servers) {
 		items.push({
@@ -76,7 +103,9 @@ export function collectItems(pi: ExtensionAPI): MainItem[] {
 			config: maskSecrets(server.config),
 		});
 	}
-	return items;
+	// Keep the array in the order the list card draws (skills, prompts, extensions, MCP) so Alt+M/N walk the rows top to bottom.
+	const rank: Record<MainItem["kind"], number> = { skill: 0, prompt: 1, extension: 2, mcp: 3 };
+	return items.sort((a, b) => rank[a.kind] - rank[b.kind]);
 }
 
 function readSkillLines(path: string | undefined): string[] {
@@ -90,6 +119,18 @@ function readSkillLines(path: string | undefined): string[] {
 export function openItem(item: MainItem): { title: string; lines: string[] } {
 	if (item.kind === "skill") {
 		return { title: `skill · ${item.name}`, lines: readSkillLines(item.path) };
+	}
+	if (item.kind === "prompt" || item.kind === "extension") {
+		const fallback = [item.description ?? `(sin archivo legible: ${item.path ? homeRelative(item.path) : "sin ruta"})`];
+		let lines = fallback;
+		try {
+			if (item.path && existsSync(item.path) && statSync(item.path).isFile()) {
+				lines = readFileSync(item.path, "utf8").split("\n").slice(0, MAX_VIEW_LINES);
+			}
+		} catch {
+			lines = fallback;
+		}
+		return { title: `${item.kind} · ${item.name}`, lines };
 	}
 	return {
 		title: `mcp · ${item.name}`,
@@ -143,6 +184,16 @@ export class MainListCard implements Component {
 				push(`${marker}${this.theme.fg("text", item.name)}`, index);
 			}
 		}
+		for (const [kind, label] of [["prompt", "Prompts"], ["extension", "Extensions"]] as const) {
+			const list = this.state.items.filter((item) => item.kind === kind);
+			push("");
+			push(this.theme.fg("accent", `${label} · ${list.length}`));
+			for (const item of list) {
+				const index = this.state.items.indexOf(item);
+				const marker = index === this.state.selected ? this.theme.fg("accent", "› ") : "  ";
+				push(`${marker}${this.theme.fg("text", item.name)}`, index);
+			}
+		}
 		push("");
 		push(this.theme.fg("accent", `MCP · ${mcp.length}`));
 		for (const item of mcp) {
@@ -181,7 +232,7 @@ export class MainViewerCard implements Component {
 		const rows = Math.max(2, height ?? 12);
 		const opened = this.state.opened;
 		if (!opened) {
-			return [truncateToWidth(this.theme.fg("dim", "Clic en un skill o MCP para leerlo aquí (solo lectura)."), Math.max(0, width))];
+			return [truncateToWidth(this.theme.fg("dim", "Clic en un skill, prompt, extensión o MCP para leerlo aquí (solo lectura)."), Math.max(0, width))];
 		}
 		const body = opened.lines.slice(0, rows - 1).map((line) => truncateToWidth(this.theme.fg("muted", line), Math.max(0, width)));
 		return [truncateToWidth(this.theme.fg("accent", `${opened.title}  (solo lectura)`), Math.max(0, width)), ...body];
