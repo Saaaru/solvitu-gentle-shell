@@ -7,47 +7,53 @@ export interface SolviFrameOptions {
 	width: number;
 }
 
+interface WidthState {
+	width: number;
+	lastCharWidth: number;
+}
+
+/** Advances the running column width by one code point (shared by calcVisibleWidth and truncation). */
+function advanceWidth(state: WidthState, cp: number): void {
+	if (cp === 0xfe0f) {
+		// Emoji variation selector promotes a 1-column symbol (like ☁ \u2601) to 2 columns in terminal
+		if (state.lastCharWidth === 1) {
+			state.width += 1;
+			state.lastCharWidth = 2;
+		}
+		return;
+	}
+	if (cp >= 0xfe00 && cp <= 0xfe0e) {
+		// Other variation selectors are 0-width
+		return;
+	}
+	if (
+		(cp >= 0x1100 && cp <= 0x11ff) || // Hangul Jamo
+		(cp >= 0x2e80 && cp <= 0xa4cf) || // CJK Radicals, Kangxi, CJK Unified Ideographs
+		(cp >= 0xac00 && cp <= 0xd7a3) || // Hangul Syllables
+		(cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility Ideographs
+		(cp >= 0xfe10 && cp <= 0xfe19) || // Vertical forms
+		(cp >= 0xfe30 && cp <= 0xfe6f) || // CJK Compatibility Forms
+		(cp >= 0xff00 && cp <= 0xff60) || // Fullwidth Forms
+		(cp >= 0xffe0 && cp <= 0xffe6) ||
+		(cp >= 0x1f300 && cp <= 0x1faff) // Emojis, Symbols (🤖, 🌷, etc.)
+	) {
+		state.width += 2;
+		state.lastCharWidth = 2;
+	} else if (cp >= 0x20) {
+		state.width += 1;
+		state.lastCharWidth = 1;
+	}
+}
+
 /**
  * Calculates visible terminal column width, ignoring ANSI sequences and
  * accounting for 2-column wide characters and emojis (e.g. 🤖, 🌷).
  */
 export function calcVisibleWidth(text: string): number {
 	const plain = stripAnsi(text);
-	let width = 0;
-	let lastCharWidth = 0;
-	for (const char of plain) {
-		const cp = char.codePointAt(0) ?? 0;
-		if (cp === 0xfe0f) {
-			// Emoji variation selector promotes a 1-column symbol (like ☁ \u2601) to 2 columns in terminal
-			if (lastCharWidth === 1) {
-				width += 1;
-				lastCharWidth = 2;
-			}
-			continue;
-		}
-		if (cp >= 0xfe00 && cp <= 0xfe0e) {
-			// Other variation selectors are 0-width
-			continue;
-		}
-		if (
-			(cp >= 0x1100 && cp <= 0x11ff) || // Hangul Jamo
-			(cp >= 0x2e80 && cp <= 0xa4cf) || // CJK Radicals, Kangxi, CJK Unified Ideographs
-			(cp >= 0xac00 && cp <= 0xd7a3) || // Hangul Syllables
-			(cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility Ideographs
-			(cp >= 0xfe10 && cp <= 0xfe19) || // Vertical forms
-			(cp >= 0xfe30 && cp <= 0xfe6f) || // CJK Compatibility Forms
-			(cp >= 0xff00 && cp <= 0xff60) || // Fullwidth Forms
-			(cp >= 0xffe0 && cp <= 0xffe6) ||
-			(cp >= 0x1f300 && cp <= 0x1faff) // Emojis, Symbols (🤖, 🌷, etc.)
-		) {
-			width += 2;
-			lastCharWidth = 2;
-		} else if (cp >= 0x20) {
-			width += 1;
-			lastCharWidth = 1;
-		}
-	}
-	return width;
+	const state: WidthState = { width: 0, lastCharWidth: 0 };
+	for (const char of plain) advanceWidth(state, char.codePointAt(0) ?? 0);
+	return state.width;
 }
 
 /**
@@ -82,7 +88,42 @@ export const ESCAPE_ATOM_SINGLE = /^(?:\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x1b]*(?:\x
  */
 export function truncateAnsiAware(text: string, maxWidth: number): string {
 	if (calcVisibleWidth(text) <= maxWidth) return text;
-	const parts = text.split(/(\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x1b]*(?:\x1b\\|\x07)|\x1b_[^\x1b]*\x1b\\)/g);
+	const parts = text.split(ESCAPE_SPLIT);
+	// A stray escape byte that is not a complete sequence can change the width when later characters
+	// arrive, so the running width would no longer be additive. Those rare lines take the exact slow path.
+	for (const part of parts) {
+		if (part && part.includes("\x1b") && !ESCAPE_ATOM_SINGLE.test(part)) {
+			return truncateAnsiAwareExact(text, parts, maxWidth);
+		}
+	}
+	const state: WidthState = { width: 0, lastCharWidth: 0 };
+	let out = "";
+	let cut = false;
+	for (const part of parts) {
+		if (!part) continue;
+		if (ESCAPE_ATOM_SINGLE.test(part)) {
+			out += part;
+			continue;
+		}
+		for (const char of part) {
+			advanceWidth(state, char.codePointAt(0) ?? 0);
+			if (state.width > maxWidth) {
+				cut = true;
+				break;
+			}
+			out += char;
+		}
+		if (cut) break;
+	}
+	ESCAPE_ATOM.lastIndex = 0;
+	if (cut && ESCAPE_ATOM.test(text)) out += "\x1b[39m";
+	return out;
+}
+
+const ESCAPE_SPLIT = /(\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x1b]*(?:\x1b\\|\x07)|\x1b_[^\x1b]*\x1b\\)/g;
+
+/** Original character-by-character truncation, kept for lines carrying malformed escape bytes. */
+function truncateAnsiAwareExact(text: string, parts: string[], maxWidth: number): string {
 	let out = "";
 	let cut = false;
 	for (const part of parts) {
@@ -103,6 +144,25 @@ export function truncateAnsiAware(text: string, maxWidth: number): string {
 	ESCAPE_ATOM.lastIndex = 0;
 	if (cut && ESCAPE_ATOM.test(text)) out += "\x1b[39m";
 	return out;
+}
+
+/**
+ * Framed body rows keyed by inner width and raw line. A streaming answer only changes its last lines,
+ * so every earlier line is framed once instead of once per render.
+ */
+const FRAMED_ROW_CACHE_LIMIT = 6000;
+const framedRowCache = new Map<string, string>();
+
+function framedRow(line: string, innerWidth: number): string {
+	const key = innerWidth + "\u0000" + line;
+	const hit = framedRowCache.get(key);
+	if (hit !== undefined) return hit;
+	const truncated = truncateAnsiAware(line, innerWidth);
+	const w = calcVisibleWidth(truncated);
+	const row = truncated + " ".repeat(Math.max(0, innerWidth - w));
+	if (framedRowCache.size >= FRAMED_ROW_CACHE_LIMIT) framedRowCache.clear();
+	framedRowCache.set(key, row);
+	return row;
 }
 
 /**
@@ -137,12 +197,8 @@ export function frameCategoryBox(
 	const top = color("┌─" + titleStr + "─".repeat(fillLen) + "┐");
 	const bot = color("└" + "─".repeat(safeWidth - 2) + "┘");
 
-	const body = lines.map((line) => {
-		const truncated = truncateAnsiAware(line, innerWidth);
-		const w = calcVisibleWidth(truncated);
-		const pad = " ".repeat(Math.max(0, innerWidth - w));
-		return color("│") + " " + truncated + pad + " " + color("│");
-	});
+	const bar = color("│");
+	const body = lines.map((line) => bar + " " + framedRow(line, innerWidth) + " " + bar);
 
 	return [top, ...body, bot];
 }
