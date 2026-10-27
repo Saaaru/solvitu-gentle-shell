@@ -13,5 +13,6 @@
 	"gentleCardWarning": "warning",
 	"gentleCardError": "error",
 	"sidebarBorder": "border",
-	"agentMessage": "accent"
+	"agentMessage": "accent",
+	"assistantMessage": "gentle"
 }

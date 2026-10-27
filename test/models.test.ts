@@ -10,6 +10,7 @@ import {
 	aggregateSessionUsage,
 	buildModelRows,
 	formatModelRow,
+	usageBar,
 	type ModelLike,
 } from "../src/models/models-client.ts";
 import { WorkspaceModelsCard } from "../src/models/models-card.ts";
@@ -210,4 +211,52 @@ test("models - WorkspaceModelsCard empty state", () => {
 	const lines = card.render(44);
 	assert.ok(lines.join("\n").includes("Sin modelos habilitados"));
 	for (const line of lines) assert.equal(calcVisibleWidth(line), 44);
+});
+
+test("models - usageBar fills by session tokens over the context window and colors by level", () => {
+	const low = usageBar(50_000, 200_000);
+	assert.equal(low.percent, 25);
+	assert.equal(low.level, "ok");
+	assert.equal(low.text.length, 12);
+	assert.equal(low.text, "███░░░░░░░░░");
+
+	assert.equal(usageBar(150_000, 200_000).level, "warn");
+	assert.equal(usageBar(190_000, 200_000).level, "high");
+	assert.equal(usageBar(900_000, 200_000).percent, 100, "usage above the window is capped at 100%");
+	assert.equal(usageBar(900_000, 200_000).text, "████████████");
+	assert.equal(usageBar(0, undefined).percent, 0, "unknown context window shows an empty bar");
+	assert.equal(usageBar(0, undefined).level, "ok");
+});
+
+test("models - formatModelRow adds a usage bar for used models only", () => {
+	const used = formatModelRow({
+		key: "x/y",
+		id: "y",
+		provider: "x",
+		name: "Why",
+		active: false,
+		contextWindow: 200000,
+		messages: 2,
+		input: 150000,
+		output: 10000,
+		cacheRead: 0,
+		cost: 1.5,
+	});
+	assert.equal(used.bar?.level, "warn");
+	assert.equal(used.bar?.percent, 80);
+	assert.match(used.bar?.label ?? "", /160K\/200K \(80%\)/);
+
+	const idle = formatModelRow({
+		key: "x/z",
+		id: "z",
+		provider: "x",
+		name: "Zed",
+		active: false,
+		messages: 0,
+		input: 0,
+		output: 0,
+		cacheRead: 0,
+		cost: 0,
+	});
+	assert.equal(idle.bar, undefined);
 });

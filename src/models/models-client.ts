@@ -229,6 +229,31 @@ function fmtTokens(n: number): string {
 	return String(n);
 }
 
+export type UsageLevel = "ok" | "warn" | "high";
+
+export interface UsageBar {
+	/** Filled and empty cells, e.g. "███░░░░░░░░░". */
+	text: string;
+	/** Session tokens over the context window, capped at 100. */
+	percent: number;
+	level: UsageLevel;
+	/** Short readable summary, e.g. "160K/200K (80%)". */
+	label: string;
+}
+
+const USAGE_BAR_CELLS = 12;
+const USAGE_WARN_PERCENT = 60;
+const USAGE_HIGH_PERCENT = 85;
+
+/** Fills a bar by used tokens over the context window; the caller colors it by `level`. */
+export function usageBar(used: number, contextWindow: number | undefined, cells = USAGE_BAR_CELLS): UsageBar {
+	const percent = contextWindow && contextWindow > 0 ? Math.min(100, Math.round((used / contextWindow) * 100)) : 0;
+	const filled = Math.round((percent / 100) * cells);
+	const level: UsageLevel = percent >= USAGE_HIGH_PERCENT ? "high" : percent >= USAGE_WARN_PERCENT ? "warn" : "ok";
+	const label = contextWindow ? `${fmtTokens(used)}/${fmtTokens(contextWindow)} (${percent}%)` : `${fmtTokens(used)} sin ventana`;
+	return { text: "█".repeat(filled) + "░".repeat(cells - filled), percent, level, label };
+}
+
 export interface FormattedModelRow {
 	/** Left part of line 1 (name + provider). */
 	title: string;
@@ -236,6 +261,8 @@ export interface FormattedModelRow {
 	right: string;
 	/** Line 2: session tokens and cost. */
 	detail: string;
+	/** Line 2b: session consumption bar; absent when the model has no session usage. */
+	bar?: UsageBar;
 	/** Line 3 (active model only): live context usage and quota. */
 	extra?: string;
 }
@@ -247,6 +274,7 @@ export function formatModelRow(row: ModelRow): FormattedModelRow {
 		row.messages > 0
 			? `  ${fmtTokens(row.input)} in / ${fmtTokens(row.output)} out · $${row.cost.toFixed(2)}`
 			: "  - sin uso en sesión";
+	const bar = row.messages > 0 ? usageBar(row.input + row.output, row.contextWindow) : undefined;
 	let extra: string | undefined;
 	if (row.active) {
 		const parts: string[] = [];
@@ -257,5 +285,5 @@ export function formatModelRow(row: ModelRow): FormattedModelRow {
 		parts.push(typeof row.quotaPercent === "number" ? `cuota ${Math.round(row.quotaPercent)}%` : "cuota -");
 		extra = `  ${parts.join(" · ")}`;
 	}
-	return { title, right, detail, extra };
+	return { title, right, detail, bar, extra };
 }

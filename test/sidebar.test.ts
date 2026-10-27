@@ -71,12 +71,12 @@ test("sidebar tabs - renderSolviSidebarTabBar generates expected tabs, non-empty
 	assert.equal(visibleWidth(unthemedBar.line), 50);
 	assert.equal(visibleWidth(unthemedBar.divider), 50);
 
-	// Generates bar with expected tabs: 1:STACK, 2:GIT, 3:PROF, 4:FLDR, 5:SKILLS, 6:Solvi
+	// Generates bar with expected tabs: 1:STACK, 2:GIT, 3:PROF, 4:FLDR, 5:EXT, 6:Solvi
 	assert.ok(unthemedBar.line.includes("1:STACK"));
 	assert.ok(unthemedBar.line.includes("2:GIT"));
 	assert.ok(unthemedBar.line.includes("3:PROF"));
 	assert.ok(unthemedBar.line.includes("4:FLDR"));
-	assert.ok(unthemedBar.line.includes("5:SKILLS"));
+	assert.ok(unthemedBar.line.includes("5:EXT"));
 
 	// Non-empty hitboxes for canonical tabs
 	assert.ok(unthemedBar.hitboxes.length >= 5);

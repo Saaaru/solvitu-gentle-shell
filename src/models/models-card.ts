@@ -96,6 +96,10 @@ export class WorkspaceModelsCard implements Component {
 			const name = row.active ? c.mint(f.title) : c.text(f.title);
 			lines.push(boxLine(name, c.dim(f.right)));
 			lines.push(boxLine(c.muted(f.detail)));
+			if (f.bar) {
+				const paint = f.bar.level === "high" ? c.coral : f.bar.level === "warn" ? c.yellow : c.mint;
+				lines.push(boxLine(`  ${paint(f.bar.text)} ${c.dim(f.bar.label)}`));
+			}
 			if (f.extra) lines.push(boxLine(c.gold(f.extra)));
 		}
 		if (result.hidden > 0) {

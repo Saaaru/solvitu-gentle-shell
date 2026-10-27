@@ -25,7 +25,7 @@ export const SOLVI_SIDEBAR_TABS: readonly SolviSidebarTab[] = [
 	{ id: "git", key: "2", label: "GIT", title: "Git Graph & Working Tree", cards: SIDEBAR_TAB_CARD_MAP.git },
 	{ id: "prof", key: "3", label: "PROF", title: "Profiles & Clusters", cards: SIDEBAR_TAB_CARD_MAP.prof },
 	{ id: "tree", key: "4", label: "FLDR", title: "Folder Explorer", cards: SIDEBAR_TAB_CARD_MAP.tree },
-	{ id: "skills", key: "5", label: "SKILLS", title: "Skills & MCP", cards: SIDEBAR_TAB_CARD_MAP.skills },
+	{ id: "skills", key: "5", label: "EXT", title: "Extensions & MCP", cards: SIDEBAR_TAB_CARD_MAP.skills },
 	{ id: "solvi", key: "6", label: "Solvi", title: "Solvi", cards: SIDEBAR_TAB_CARD_MAP.solvi },
 ];
 

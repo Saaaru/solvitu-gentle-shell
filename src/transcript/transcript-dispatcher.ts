@@ -2,7 +2,7 @@ import type { Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { loadSolviStrings, detectSystemUser } from "../solvi-strings.ts";
 import { loadSolviColors } from "../solvi-colors.ts";
-import { safeFg, transformTranscriptLines } from "../solvi-theme.ts";
+import { safeFg, stripAnsi, transformTranscriptLines } from "../solvi-theme.ts";
 import { frameCategoryBox } from "./transcript-ansi.ts";
 import { unwrapNativeCard, isAsciiArtOrBanner } from "./transcript-unwrap.ts";
 import { toolFilePath } from "./transcript-highlight.ts";
@@ -28,6 +28,12 @@ import {
 	FramedCardMouseProxy,
 } from "./transcript-tools-special.ts";
 import { formatAssistantProse } from "./transcript-prose.ts";
+import {
+	collapsedToolLine,
+	isToolExpanded,
+	PathLinkMouseProxy,
+	ToolToggleMouseProxy,
+} from "./transcript-interactive.ts";
 
 /**
  * Checks whether a transcript component is a bash execution.
@@ -195,6 +201,20 @@ export function formatTranscriptChild(
 	return transformTranscriptLines(unwrapped, theme);
 }
 
+/** First non-blank plain line of a tool result, used as the target of a collapsed card. */
+function firstContentLine(lines: string[]): string {
+	const first = lines.map((line) => stripAnsi(line).trim()).find((line) => line.length > 0);
+	return first ?? "";
+}
+
+/** Drops leading and trailing blank lines so line indexes match the framed card body. */
+function trimBlankLines(lines: string[]): string[] {
+	const out = [...lines];
+	while (out.length && stripAnsi(out[0] ?? "").trim() === "") out.shift();
+	while (out.length && stripAnsi(out[out.length - 1] ?? "").trim() === "") out.pop();
+	return out;
+}
+
 /**
  * Formats a list of transcript children with intelligent grouping.
  */
@@ -214,6 +234,19 @@ export function formatTranscriptChildren(
 			lines.push("");
 			mouseChildren.push({ component: {} as any, height: 1 });
 		}
+	};
+
+	// Tool cards start as one line (title and target); a click expands the framed card.
+	const pushToolCard = (child: Component, boxed: string[], title: string, toneKey: string, target: string) => {
+		if (isToolExpanded(child)) {
+			const forward = new FramedCardMouseProxy(child, boxed.length);
+			mouseChildren.push({ component: new ToolToggleMouseProxy(child, forward, true), height: boxed.length });
+			lines.push(...boxed);
+			return;
+		}
+		const summary = collapsedToolLine(title, target, width);
+		mouseChildren.push({ component: new ToolToggleMouseProxy(child), height: 1 });
+		lines.push(theme ? safeFg(theme, toneKey, summary) : summary);
 	};
 
 	let i = 0;
@@ -291,8 +324,7 @@ export function formatTranscriptChildren(
 			const unwrapped = unwrapNativeCard(rawLines);
 			const styled = formatReadLines(unwrapped, toolFilePath(child, unwrapped), theme);
 			const boxed = frameCategoryBox(styled, "\u270E read", colors.readMessage, width, theme);
-			mouseChildren.push({ component: new FramedCardMouseProxy(child, boxed.length), height: boxed.length });
-			lines.push(...boxed);
+			pushToolCard(child, boxed, "\u270E read", colors.readMessage, toolFilePath(child, unwrapped) ?? "");
 			i++;
 			continue;
 		}
@@ -304,8 +336,7 @@ export function formatTranscriptChildren(
 			const unwrapped = unwrapNativeCard(rawLines);
 			const styled = formatWriteDiffLines(unwrapped, toolFilePath(child, unwrapped), theme, (child as any).toolName);
 			const boxed = frameCategoryBox(styled, "\u270E write", colors.writeMessage, width, theme);
-			mouseChildren.push({ component: new FramedCardMouseProxy(child, boxed.length), height: boxed.length });
-			lines.push(...boxed);
+			pushToolCard(child, boxed, "\u270E write", colors.writeMessage, toolFilePath(child, unwrapped) ?? "");
 			i++;
 			continue;
 		}
@@ -316,8 +347,7 @@ export function formatTranscriptChildren(
 			const rawLines = child.render(width - 4);
 			const unwrapped = unwrapNativeCard(rawLines);
 			const boxed = frameCategoryBox(unwrapped, "fetch", colors.fetchMessage, width, theme);
-			mouseChildren.push({ component: new FramedCardMouseProxy(child, boxed.length), height: boxed.length });
-			lines.push(...boxed);
+			pushToolCard(child, boxed, "fetch", colors.fetchMessage, firstContentLine(unwrapped));
 			i++;
 			continue;
 		}
@@ -328,8 +358,7 @@ export function formatTranscriptChildren(
 			const rawLines = child.render(width - 4);
 			const unwrapped = unwrapNativeCard(rawLines);
 			const boxed = frameCategoryBox(unwrapped, "search", colors.searchMessage, width, theme);
-			mouseChildren.push({ component: new FramedCardMouseProxy(child, boxed.length), height: boxed.length });
-			lines.push(...boxed);
+			pushToolCard(child, boxed, "search", colors.searchMessage, firstContentLine(unwrapped));
 			i++;
 			continue;
 		}
@@ -543,10 +572,17 @@ export function formatTranscriptChildren(
 			continue;
 		}
 
-		const transformed =
-			name === "AssistantMessageComponent"
-				? formatAssistantProse(rawLines, theme, width)
-				: transformTranscriptLines(unwrapNativeCard(rawLines), theme);
+		if (name === "AssistantMessageComponent") {
+			const prose = trimBlankLines(formatAssistantProse(rawLines, theme, width));
+			const title = `\u{1F916} ${strings.welcomePersona.name || "assistant"}`;
+			const boxed = frameCategoryBox(prose, title, colors.assistantMessage ?? "gentle", width, theme);
+			mouseChildren.push({ component: new PathLinkMouseProxy(prose), height: boxed.length });
+			lines.push(...boxed);
+			i++;
+			continue;
+		}
+
+		const transformed = transformTranscriptLines(unwrapNativeCard(rawLines), theme);
 		mouseChildren.push({ component: child, height: transformed.length });
 		lines.push(...transformed);
 		i++;

@@ -12,6 +12,7 @@ import { SolviContextMonitor } from "./src/solvi-context-monitor.ts";
 import { installWelcomeBanner } from "./src/welcome.ts";
 import { installWorkspaceStatuses } from "./src/statuses.ts";
 import { COMPACT_TOOLS, compactToolRenderer } from "./src/tool-lines.ts";
+import { ensureCliProxyApiRunning } from "./src/cliproxy-autostart.ts";
 import { setCapabilityOverrides } from "@earendil-works/pi-tui";
 
 export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
@@ -42,10 +43,10 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	};
 	pi.registerShortcut("alt+h", { description: "Previous sidebar tab", handler: () => cycleTab(-1) });
 	pi.registerShortcut("alt+l", { description: "Next sidebar tab", handler: () => cycleTab(1) });
-	// SKILLS tab: Alt+M / Alt+N select a skill or MCP server, Alt+O reads it in the viewer below
-	pi.registerShortcut("alt+m", { description: "Previous skill or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, -1) });
-	pi.registerShortcut("alt+n", { description: "Next skill or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, 1) });
-	pi.registerShortcut("alt+o", { description: "Open the selected skill or MCP item", handler: () => footerRegistry.mainView && openSelected(footerRegistry.mainView) });
+	// EXT tab: Alt+M / Alt+N select an extension or MCP server, Alt+O reads it in the viewer below
+	pi.registerShortcut("alt+m", { description: "Previous extension or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, -1) });
+	pi.registerShortcut("alt+n", { description: "Next extension or MCP item", handler: () => footerRegistry.mainView && moveSelection(footerRegistry.mainView, 1) });
+	pi.registerShortcut("alt+o", { description: "Open the selected extension or MCP item", handler: () => footerRegistry.mainView && openSelected(footerRegistry.mainView) });
 
 	// Alt+I / Alt+J scroll or move selection in whatever the active tab shows. Plain arrow
 	// keys stay with the chat input/history. Neither Alt+Up/Alt+Down (reserved by pi for
@@ -87,6 +88,10 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 
 	// 1. Hook into session_start to install the sidebar footer and todo mirror
 	pi.on("session_start", async (_event, ctx) => {
+		// Auto-start the local CLIProxyAPI server (Gemini/Claude via subscription OAuth) if it's
+		// installed but not already listening, so it never needs to be launched by hand.
+		ensureCliProxyApiRunning().catch(() => {});
+
 		if (!ctx.hasUI) return;
 
 		// Intercept ctx.ui.setWidget so the todo widget always renders in the sidebar rail slot.
