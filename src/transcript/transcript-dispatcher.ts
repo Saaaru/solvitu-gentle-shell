@@ -36,6 +36,7 @@ import {
 } from "./transcript-assistant-cache.ts";
 import { PathLinkMouseProxy } from "./transcript-interactive.ts";
 import { isSolviCardComponent } from "../tool-card.ts";
+import { memoizeChildCard, type CachedMouseEntry } from "./transcript-child-cache.ts";
 
 /**
  * Checks whether a transcript component is a bash execution.
@@ -244,9 +245,12 @@ export function formatTranscriptChildren(
 		if (name === "UserMessageComponent") {
 			ensureBreathingRoom();
 			const rawLines = child.render(width - 4);
-			const boxed = frameCategoryBox(rawLines, `🐝 ${user}`, colors.userMessage, width, theme);
-			mouseChildren.push({ component: child, height: boxed.length });
-			lines.push(...boxed);
+			const card = memoizeChildCard("user", [child], [rawLines], width, theme, [colors, user], () => {
+				const boxed = frameCategoryBox(rawLines, `🐝 ${user}`, colors.userMessage, width, theme);
+				return { lines: boxed, mouse: [{ component: child, height: boxed.length }] };
+			});
+			mouseChildren.push(...card.mouse);
+			lines.push(...card.lines);
 			i++;
 			continue;
 		}
@@ -265,63 +269,77 @@ export function formatTranscriptChildren(
 		if (isBashComponent(child)) {
 			ensureBreathingRoom();
 			const bashGroup: Component[] = [];
+			const consumed: Component[] = [];
+			const spacerMouse: CachedMouseEntry[] = [];
 			while (i < children.length) {
 				const curr = children[i];
 				if (isBashComponent(curr)) {
 					bashGroup.push(curr);
+					consumed.push(curr);
 					i++;
 				} else if (isSpacer(curr) && i + 1 < children.length && isBashComponent(children[i + 1])) {
-					mouseChildren.push({ component: curr, height: 0 });
+					spacerMouse.push({ component: curr, height: 0 });
+					consumed.push(curr);
 					i++;
 				} else {
 					break;
 				}
 			}
 
-			const combinedLines: string[] = [];
-			for (let j = 0; j < bashGroup.length; j++) {
-				const comp = bashGroup[j];
-				const raw = comp.render(width - 4);
-				const cleaned = cleanBashLines(raw);
-				if (cleaned.length > 0) {
-					if (combinedLines.length > 0) {
-						combinedLines.push("");
+			const bashRaws = bashGroup.map((comp) => comp.render(width - 4));
+			const card = memoizeChildCard("bash", consumed, bashRaws, width, theme, [colors], () => {
+				const combinedLines: string[] = [];
+				for (const raw of bashRaws) {
+					const cleaned = cleanBashLines(raw);
+					if (cleaned.length > 0) {
+						if (combinedLines.length > 0) {
+							combinedLines.push("");
+						}
+						const styled = formatBashOutputLines(cleaned, theme, colors.bashOutput);
+						combinedLines.push(...styled);
 					}
-					const styled = formatBashOutputLines(cleaned, theme, colors.bashOutput);
-					combinedLines.push(...styled);
 				}
-			}
 
-			const cardLines = frameCategoryBox(
-				combinedLines.length ? combinedLines : ["$"],
-				">_ bash",
-				colors.bashMessage,
-				width,
-				theme,
-			);
+				const cardLines = frameCategoryBox(
+					combinedLines.length ? combinedLines : ["$"],
+					">_ bash",
+					colors.bashMessage,
+					width,
+					theme,
+				);
 
-			const avgHeight = Math.max(1, Math.floor(cardLines.length / bashGroup.length));
-			for (let j = 0; j < bashGroup.length; j++) {
-				const compHeight =
-					j === bashGroup.length - 1
-						? cardLines.length - avgHeight * (bashGroup.length - 1)
-						: avgHeight;
-				mouseChildren.push({ component: bashGroup[j], height: compHeight });
-			}
+				const mouse: CachedMouseEntry[] = [...spacerMouse];
+				const avgHeight = Math.max(1, Math.floor(cardLines.length / bashGroup.length));
+				for (let j = 0; j < bashGroup.length; j++) {
+					const compHeight =
+						j === bashGroup.length - 1
+							? cardLines.length - avgHeight * (bashGroup.length - 1)
+							: avgHeight;
+					mouse.push({ component: bashGroup[j], height: compHeight });
+				}
+				return { lines: cardLines, mouse };
+			});
 
-			lines.push(...cardLines);
+			mouseChildren.push(...card.mouse);
+			lines.push(...card.lines);
 			continue;
 		}
 
 		if (isReviewComponent(child)) {
 			ensureBreathingRoom();
 			const rawLines = child.render(width - 4);
-			const unwrapped = unwrapNativeCard(rawLines);
-			const title = extractReviewHeader(unwrapped, child);
-			const styled = formatReviewOutputLines(unwrapped, theme);
-			const boxed = frameCategoryBox(styled, title, colors.reviewMessage ?? "gentle", width, theme);
-			mouseChildren.push({ component: new FramedCardMouseProxy(child, boxed.length), height: boxed.length });
-			lines.push(...boxed);
+			const card = memoizeChildCard("review", [child], [rawLines], width, theme, [colors], () => {
+				const unwrapped = unwrapNativeCard(rawLines);
+				const title = extractReviewHeader(unwrapped, child);
+				const styled = formatReviewOutputLines(unwrapped, theme);
+				const boxed = frameCategoryBox(styled, title, colors.reviewMessage ?? "gentle", width, theme);
+				return {
+					lines: boxed,
+					mouse: [{ component: new FramedCardMouseProxy(child, boxed.length), height: boxed.length }],
+				};
+			});
+			mouseChildren.push(...card.mouse);
+			lines.push(...card.lines);
 			i++;
 			continue;
 		}
@@ -330,62 +348,71 @@ export function formatTranscriptChildren(
 		if (isSubagentComponent(child)) {
 			ensureBreathingRoom();
 			const agentGroup: Component[] = [];
+			const consumed: Component[] = [];
+			const spacerMouse: CachedMouseEntry[] = [];
 			while (i < children.length) {
 				const curr = children[i];
 				if (isSubagentComponent(curr)) {
 					agentGroup.push(curr);
+					consumed.push(curr);
 					i++;
 				} else if (isSpacer(curr) && i + 1 < children.length && isSubagentComponent(children[i + 1])) {
-					mouseChildren.push({ component: curr, height: 0 });
+					spacerMouse.push({ component: curr, height: 0 });
+					consumed.push(curr);
 					i++;
 				} else {
 					break;
 				}
 			}
 
-			let combinedLines: string[] = [];
 			const allStatusPolls = agentGroup.every((c) => isAgentStatusComponent(c));
-
-			if (allStatusPolls && agentGroup.length > 1) {
-				const latest = agentGroup[agentGroup.length - 1];
-				const raw = latest.render(width);
-				const unwrapped = unwrapNativeCard(raw);
-				const styled = formatSubagentLines(unwrapped, theme);
-				const countHint = safeFg(theme, "muted", ` (${agentGroup.length} status polls coalesced)`, "muted");
-				if (styled.length > 0) {
-					styled[0] = `${styled[0]}${countHint}`;
-				}
-				combinedLines = styled;
-			} else {
-				for (const comp of agentGroup) {
-					const raw = comp.render(width - 4);
-					const unwrapped = unwrapNativeCard(raw);
-					if (combinedLines.length > 0) {
-						combinedLines.push("");
-					}
+			const coalesced = allStatusPolls && agentGroup.length > 1;
+			const agentRaws = coalesced
+				? [agentGroup[agentGroup.length - 1].render(width)]
+				: agentGroup.map((comp) => comp.render(width - 4));
+			const card = memoizeChildCard(coalesced ? "subagent-polls" : "subagent", consumed, agentRaws, width, theme, [colors], () => {
+				let combinedLines: string[] = [];
+				if (coalesced) {
+					const unwrapped = unwrapNativeCard(agentRaws[0]);
 					const styled = formatSubagentLines(unwrapped, theme);
-					combinedLines.push(...styled);
+					const countHint = safeFg(theme, "muted", ` (${agentGroup.length} status polls coalesced)`, "muted");
+					if (styled.length > 0) {
+						styled[0] = `${styled[0]}${countHint}`;
+					}
+					combinedLines = styled;
+				} else {
+					for (const raw of agentRaws) {
+						const unwrapped = unwrapNativeCard(raw);
+						if (combinedLines.length > 0) {
+							combinedLines.push("");
+						}
+						const styled = formatSubagentLines(unwrapped, theme);
+						combinedLines.push(...styled);
+					}
 				}
-			}
 
-			const cardLines = frameCategoryBox(
-				combinedLines.length ? combinedLines : ["agent"],
-				"🤖 subagent",
-				colors.agentMessage ?? "accent",
-				width,
-				theme,
-			);
+				const cardLines = frameCategoryBox(
+					combinedLines.length ? combinedLines : ["agent"],
+					"🤖 subagent",
+					colors.agentMessage ?? "accent",
+					width,
+					theme,
+				);
 
-			const avgHeight = Math.max(1, Math.floor(cardLines.length / agentGroup.length));
-			for (let j = 0; j < agentGroup.length; j++) {
-				const compHeight =
-					j === agentGroup.length - 1
-						? cardLines.length - avgHeight * (agentGroup.length - 1)
-						: avgHeight;
-				mouseChildren.push({ component: new FramedCardMouseProxy(agentGroup[j], compHeight), height: compHeight });
-			}
+				const mouse: CachedMouseEntry[] = [...spacerMouse];
+				const avgHeight = Math.max(1, Math.floor(cardLines.length / agentGroup.length));
+				for (let j = 0; j < agentGroup.length; j++) {
+					const compHeight =
+						j === agentGroup.length - 1
+							? cardLines.length - avgHeight * (agentGroup.length - 1)
+							: avgHeight;
+					mouse.push({ component: new FramedCardMouseProxy(agentGroup[j], compHeight), height: compHeight });
+				}
+				return { lines: cardLines, mouse };
+			});
 
-			lines.push(...cardLines);
+			mouseChildren.push(...card.mouse);
+			lines.push(...card.lines);
 			continue;
 		}
 
@@ -393,48 +420,56 @@ export function formatTranscriptChildren(
 		if (isErrorTextComponent(child)) {
 			ensureBreathingRoom();
 			const errorGroup: Component[] = [];
+			const consumed: Component[] = [];
+			const spacerMouse: CachedMouseEntry[] = [];
 			while (i < children.length) {
 				const curr = children[i];
 				if (isErrorTextComponent(curr)) {
 					errorGroup.push(curr);
+					consumed.push(curr);
 					i++;
 				} else if (isSpacer(curr) && i + 1 < children.length && isErrorTextComponent(children[i + 1])) {
-					mouseChildren.push({ component: curr, height: 0 });
+					spacerMouse.push({ component: curr, height: 0 });
+					consumed.push(curr);
 					i++;
 				} else {
 					break;
 				}
 			}
 
-			const combinedLines: string[] = [];
-			for (let j = 0; j < errorGroup.length; j++) {
-				const comp = errorGroup[j];
-				const raw = comp.render(width - 4);
-				const unwrapped = unwrapNativeCard(raw);
-				if (combinedLines.length > 0) {
-					combinedLines.push("");
+			const errorRaws = errorGroup.map((comp) => comp.render(width - 4));
+			const card = memoizeChildCard("error", consumed, errorRaws, width, theme, [colors], () => {
+				const combinedLines: string[] = [];
+				for (const raw of errorRaws) {
+					const unwrapped = unwrapNativeCard(raw);
+					if (combinedLines.length > 0) {
+						combinedLines.push("");
+					}
+					combinedLines.push(...unwrapped);
 				}
-				combinedLines.push(...unwrapped);
-			}
 
-			const cardLines = frameCategoryBox(
-				combinedLines.length ? combinedLines : ["Error"],
-				"\u26A0 error",
-				colors.errorMessage,
-				width,
-				theme,
-			);
+				const cardLines = frameCategoryBox(
+					combinedLines.length ? combinedLines : ["Error"],
+					"\u26A0 error",
+					colors.errorMessage,
+					width,
+					theme,
+				);
 
-			const avgHeight = Math.max(1, Math.floor(cardLines.length / errorGroup.length));
-			for (let j = 0; j < errorGroup.length; j++) {
-				const compHeight =
-					j === errorGroup.length - 1
-						? cardLines.length - avgHeight * (errorGroup.length - 1)
-						: avgHeight;
-				mouseChildren.push({ component: errorGroup[j], height: compHeight });
-			}
+				const mouse: CachedMouseEntry[] = [...spacerMouse];
+				const avgHeight = Math.max(1, Math.floor(cardLines.length / errorGroup.length));
+				for (let j = 0; j < errorGroup.length; j++) {
+					const compHeight =
+						j === errorGroup.length - 1
+							? cardLines.length - avgHeight * (errorGroup.length - 1)
+							: avgHeight;
+					mouse.push({ component: errorGroup[j], height: compHeight });
+				}
+				return { lines: cardLines, mouse };
+			});
 
-			lines.push(...cardLines);
+			mouseChildren.push(...card.mouse);
+			lines.push(...card.lines);
 			continue;
 		}
 
@@ -458,6 +493,20 @@ export function formatTranscriptChildren(
 			}
 		}
 		const rawLines = child.render(width);
+		if (name !== "AssistantMessageComponent") {
+			const card = memoizeChildCard("generic", [child], [rawLines], width, theme, [colors], () => {
+				if (isAsciiArtOrBanner(rawLines)) {
+					return { lines: rawLines, mouse: [{ component: child, height: rawLines.length }] };
+				}
+				const transformed = transformTranscriptLines(unwrapNativeCard(rawLines), theme);
+				return { lines: transformed, mouse: [{ component: child, height: transformed.length }] };
+			});
+			mouseChildren.push(...card.mouse);
+			lines.push(...card.lines);
+			i++;
+			continue;
+		}
+
 		if (isAsciiArtOrBanner(rawLines)) {
 			mouseChildren.push({ component: child, height: rawLines.length });
 			lines.push(...rawLines);

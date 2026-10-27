@@ -98,56 +98,147 @@ export function formatGentleAiCardLine(raw: string, theme?: Theme, tone: SolviCa
 	return line;
 }
 
+interface TranscriptLineState {
+	gentle: boolean;
+	tone: SolviCardTone;
+	fence: boolean;
+}
+
+const INITIAL_LINE_STATE: TranscriptLineState = { gentle: false, tone: "success", fence: false };
+
+/** Transforms one line given the state carried over from the previous line; returns the output and the next state. */
+function transformLineStep(
+	line: string,
+	theme: Theme,
+	state: TranscriptLineState,
+): { out: string; next: TranscriptLineState } {
+	let { gentle: inGentleCard, tone: currentTone, fence: inFence } = state;
+	const plain = stripAnsi(line);
+	const hasGentleTitle = plain.includes("Gentle AI");
+	const isTopRule = (plain.includes("╭") || plain.includes("┌")) && hasGentleTitle;
+	const isBottomRule = plain.includes("╰") || plain.includes("└") || plain.includes("╯") || plain.includes("┘");
+
+	if (/^\s*```/.test(plain)) inFence = !inFence;
+
+	if (isTopRule) {
+		inGentleCard = true;
+		if (
+			plain.includes("dev binary override") ||
+			plain.includes("field-test only") ||
+			plain.includes("warning") ||
+			plain.includes("preparing")
+		) {
+			currentTone = "warning";
+		} else if (plain.includes("failed") || plain.includes("error") || plain.includes("invalid")) {
+			currentTone = "error";
+		} else {
+			currentTone = "success";
+		}
+	}
+
+	if (inGentleCard) {
+		const transformed = formatGentleAiCardLine(line, theme, currentTone);
+		if (isBottomRule && !isTopRule) {
+			inGentleCard = false;
+			currentTone = "success";
+		}
+		return { out: transformed, next: { gentle: inGentleCard, tone: currentTone, fence: inFence } };
+	}
+
+	// Markdown headings get a slightly heavier typeface (bold, same color).
+	// Skipped inside fenced code blocks so `#` comments in code never bolden.
+	const out = !inFence && /^\s*#{1,6}\s+\S/.test(plain) ? bolden(theme, line) : line;
+	return { out, next: { gentle: inGentleCard, tone: currentTone, fence: inFence } };
+}
+
+/**
+ * Reference implementation of the line processor: no memoization. The cached entry point must match it byte for byte.
+ */
+export function transformTranscriptLinesUncached(rawLines: string[], theme?: Theme): string[] {
+	if (!theme || !rawLines.length) return rawLines;
+	let state = INITIAL_LINE_STATE;
+	return rawLines.map((line) => {
+		const step = transformLineStep(line, theme, state);
+		state = step.next;
+		return step.out;
+	});
+}
+
+/** Cheap signature of what the active theme paints, so a theme switch invalidates every cache built on it. */
+export function themeStamp(theme?: Theme): string {
+	if (!theme) return "";
+	try {
+		return safeFg(theme, "accent", "​");
+	} catch {
+		return "?";
+	}
+}
+
+const TONES: SolviCardTone[] = ["success", "warning", "error", "border"];
+const MEMO_LIMIT = 20000;
+
+interface LineMemo {
+	stamp: string;
+	colors: unknown;
+	/** One map per incoming state (gentle x fence x tone). */
+	maps: Map<string, { out: string; next: TranscriptLineState }>[];
+	/** Lines this transform already produced: feeding them back in is a no-op (makes repeated passes idempotent). */
+	outputs: Set<string>;
+	size: number;
+}
+
+const lineMemos = new WeakMap<object, LineMemo>();
+
+function stateIndex(state: TranscriptLineState): number {
+	return (state.gentle ? 1 : 0) + (state.fence ? 2 : 0) + TONES.indexOf(state.tone) * 4;
+}
+
+function memoFor(theme: Theme): LineMemo {
+	const stamp = themeStamp(theme);
+	const colors = loadSolviColors();
+	let memo = lineMemos.get(theme as object);
+	if (!memo || memo.stamp !== stamp || memo.colors !== colors) {
+		memo = { stamp, colors, maps: TONES.flatMap(() => Array.from({ length: 4 }, () => new Map())), outputs: new Set(), size: 0 };
+		lineMemos.set(theme as object, memo);
+	}
+	return memo;
+}
+
 // Stateful processor for transcript & dock lines: transforms Gentle AI cards into double-line
 // themed frames (warning = yellow, success = green) with robot 🤖, bolds markdown headings
 // outside fenced code blocks, and leaves other lines intact.
+// Each line's result depends only on the line, the theme and the carried state, so results are memoized
+// per (theme, state, line): repeated passes over an unchanged transcript cost a map lookup per line.
+// Lines the transform itself produced pass through untouched, so applying it again (the layout wraps
+// the transcript, the scroll view and the whole screen) does not nest the color codes a second time.
 export function transformTranscriptLines(rawLines: string[], theme?: Theme): string[] {
 	if (!theme || !rawLines.length) return rawLines;
-	let inGentleCard = false;
-	let currentTone: SolviCardTone = "success";
-	let inFence = false;
-
-	return rawLines.map((line) => {
-		const plain = stripAnsi(line);
-		const hasGentleTitle = plain.includes("Gentle AI");
-		const isTopRule = (plain.includes("╭") || plain.includes("┌")) && hasGentleTitle;
-		const isBottomRule = plain.includes("╰") || plain.includes("└") || plain.includes("╯") || plain.includes("┘");
-
-		if (/^\s*```/.test(plain)) inFence = !inFence;
-
-		if (isTopRule) {
-			inGentleCard = true;
-			if (
-				plain.includes("dev binary override") ||
-				plain.includes("field-test only") ||
-				plain.includes("warning") ||
-				plain.includes("preparing")
-			) {
-				currentTone = "warning";
-			} else if (plain.includes("failed") || plain.includes("error") || plain.includes("invalid")) {
-				currentTone = "error";
-			} else {
-				currentTone = "success";
+	let memo = memoFor(theme);
+	if (memo.size > MEMO_LIMIT) {
+		lineMemos.delete(theme as object);
+		memo = memoFor(theme);
+	}
+	let state = INITIAL_LINE_STATE;
+	const out = new Array<string>(rawLines.length);
+	for (let i = 0; i < rawLines.length; i++) {
+		const line = rawLines[i];
+		const map = memo.maps[stateIndex(state)];
+		let step = map.get(line);
+		if (!step) {
+			step = transformLineStep(line, theme, state);
+			if (memo.outputs.has(line)) {
+				// Already a themed line from an earlier pass: keep the state machine moving, never wrap it twice.
+				step = { out: line, next: step.next };
+			} else if (step.out !== line) {
+				memo.outputs.add(step.out);
 			}
+			map.set(line, step);
+			memo.size++;
 		}
-
-		if (inGentleCard) {
-			const transformed = formatGentleAiCardLine(line, theme, currentTone);
-			if (isBottomRule && !isTopRule) {
-				inGentleCard = false;
-				currentTone = "success";
-			}
-			return transformed;
-		}
-
-		// Markdown headings get a slightly heavier typeface (bold, same color).
-		// Skipped inside fenced code blocks so `#` comments in code never bolden.
-		if (!inFence && /^\s*#{1,6}\s+\S/.test(plain)) {
-			return bolden(theme, line);
-		}
-
-		return line;
-	});
+		state = step.next;
+		out[i] = step.out;
+	}
+	return out;
 }
 
 // Las cards de gentle-pi adaptadas: si es Gentle AI se formatea con robot y tono adecuado,
