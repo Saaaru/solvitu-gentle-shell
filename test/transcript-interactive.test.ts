@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findPathAt, isToolExpanded, toggleTool, collapsedToolLine } from "../src/transcript/transcript-interactive.ts";
+import { findPathAt, isToolExpanded, toggleTool, collapsedToolLine, PathLinkMouseProxy } from "../src/transcript/transcript-interactive.ts";
 import { formatTranscriptChildren } from "../src/transcript/transcript-dispatcher.ts";
 
 test("transcript interactive - tools start collapsed and a click toggles them", () => {
@@ -78,4 +78,26 @@ test("transcript dispatcher - a read tool starts as one line and expands on clic
 	const expanded = formatTranscriptChildren([child as any], 60);
 	assert.ok(expanded.lines.length > 1, "expanded card shows its framed body");
 	assert.match(expanded.lines[0], /^┌─/);
+});
+
+test("path link proxy - building it does not scan the prose lines until a click needs them", () => {
+	let reads = 0;
+	const prose = new Proxy(["alpha line", "beta line"], {
+		get(target, key, receiver) {
+			if (typeof key === "string" && /^\d+$/.test(key)) reads++;
+			return Reflect.get(target, key, receiver);
+		},
+	});
+	const proxy = new PathLinkMouseProxy(prose as unknown as string[]);
+	assert.equal(reads, 0, "constructor must not read the lines");
+	assert.equal(proxy.handleMouse({ type: "move", x: 3, y: 1 }), undefined);
+	assert.equal(reads, 0, "non-click events must not read the lines");
+});
+
+test("path link proxy - a click on a row without a path, or outside the card, is ignored", () => {
+	const proxy = new PathLinkMouseProxy(["\x1b[31mplain words only\x1b[0m", "second row"]);
+	assert.equal(proxy.handleMouse({ type: "click", x: 4, y: 1 }), undefined);
+	assert.equal(proxy.handleMouse({ type: "click", x: 4, y: 0 }), undefined);
+	assert.equal(proxy.handleMouse({ type: "click", x: 4, y: 99 }), undefined);
+	assert.equal(proxy.handleMouse({ type: "click", x: 0, y: 1 }), undefined);
 });

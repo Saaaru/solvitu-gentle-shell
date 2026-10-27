@@ -92,10 +92,18 @@ export class ToolToggleMouseProxy implements Component {
 
 /** Mouse target for an assistant card: a click on a path opens it in FLDR. */
 export class PathLinkMouseProxy implements Component {
-	private readonly plainLines: string[];
+	private plainLines?: string[];
+
+	// The proxy is rebuilt on every render but only read on a click, so the ANSI stripping waits until then.
+	private readonly proseLines: string[];
 
 	constructor(proseLines: string[]) {
-		this.plainLines = proseLines.map((line) => stripAnsi(line));
+		this.proseLines = proseLines;
+	}
+
+	private plain(): string[] {
+		this.plainLines ??= this.proseLines.map((line) => stripAnsi(line));
+		return this.plainLines;
 	}
 
 	render(_width: number): string[] {
@@ -107,8 +115,9 @@ export class PathLinkMouseProxy implements Component {
 		// Row 0 is the card's top border and content starts after "│ ".
 		const row = event.y - 1;
 		const column = event.x - 2;
-		if (row < 0 || row >= this.plainLines.length || column < 0) return undefined;
-		const path = findPathAt(this.plainLines[row], column);
+		const plain = this.plain();
+		if (row < 0 || row >= plain.length || column < 0) return undefined;
+		const path = findPathAt(plain[row], column);
 		return path && openPathInFolder(path) ? { handled: true } : undefined;
 	}
 }
