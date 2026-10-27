@@ -1,24 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findPathAt, isToolExpanded, toggleTool, collapsedToolLine, PathLinkMouseProxy } from "../src/transcript/transcript-interactive.ts";
+import { findPathAt, PathLinkMouseProxy } from "../src/transcript/transcript-interactive.ts";
 import { formatTranscriptChildren } from "../src/transcript/transcript-dispatcher.ts";
-
-test("transcript interactive - tools start collapsed and a click toggles them", () => {
-	const tool = {} as any;
-	assert.equal(isToolExpanded(tool), false);
-	toggleTool(tool);
-	assert.equal(isToolExpanded(tool), true);
-	toggleTool(tool);
-	assert.equal(isToolExpanded(tool), false);
-});
-
-test("transcript interactive - collapsed tool line shows the title and target with an expand marker", () => {
-	const line = collapsedToolLine("\u270E read", "src/solvi-theme.ts", 80);
-	assert.match(line, /read/);
-	assert.match(line, /src\/solvi-theme\.ts/);
-	assert.match(line, /\u25B8/);
-	assert.ok(line.length <= 80);
-});
 
 test("transcript interactive - findPathAt returns the path under the column", () => {
 	const text = "Edité src/solvi-theme.ts:42 y luego C:\\Users\\mfuen\\notas.md";
@@ -45,39 +28,11 @@ class AssistantMessageComponent {
 	}
 }
 
-class ReadComponent {
-	args = { path: "src/solvi-theme.ts" };
-	toolName = "read";
-	body: string[];
-	constructor(body: string[]) {
-		this.body = body;
-	}
-	render(_width: number): string[] {
-		return this.body;
-	}
-}
-
 test("transcript dispatcher - assistant answers render inside a card with the persona title", () => {
 	const { lines } = formatTranscriptChildren([new AssistantMessageComponent("Mira src/solvi-theme.ts") as any], 60);
 	assert.match(lines[0], /^┌─ \u{1F916} /u);
 	assert.ok(lines.some((l) => l.includes("src/solvi-theme.ts")));
 	assert.match(lines[lines.length - 1], /^└/);
-});
-
-test("transcript dispatcher - a read tool starts as one line and expands on click", () => {
-	const child = new ReadComponent(["   1 const x = 1;"]);
-	const collapsed = formatTranscriptChildren([child as any], 60);
-	assert.equal(collapsed.lines.length, 1);
-	assert.match(collapsed.lines[0], /read src\/solvi-theme\.ts/);
-	assert.match(collapsed.lines[0], /\u25B8/);
-
-	const proxy = collapsed.mouseChildren[0].component as any;
-	const result = proxy.handleMouse({ type: "click", x: 3, y: 0 });
-	assert.deepEqual(result, { handled: true }, "Pi reads `\"target\" in result`, so the result must be an object");
-	assert.doesNotThrow(() => "target" in result);
-	const expanded = formatTranscriptChildren([child as any], 60);
-	assert.ok(expanded.lines.length > 1, "expanded card shows its framed body");
-	assert.match(expanded.lines[0], /^┌─/);
 });
 
 test("path link proxy - building it does not scan the prose lines until a click needs them", () => {
