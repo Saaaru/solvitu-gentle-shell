@@ -23,6 +23,7 @@ import { getGitSyncBadge } from "../src/solvi-git-graph.ts";
 import { measureDockMetrics, findDock, findTranscript } from "../src/sidebar-dock.ts";
 import { createSidebarMouseHandler } from "../src/sidebar-mouse.ts";
 import { resetAll } from "./test-helpers.ts";
+import { awaitGitIdle } from "../src/git/git-swr.ts";
 
 test("sidebar tabs - loadSolviLayout contains tabs defaults and mergeLayout respects overrides", () => {
 	resetAll();
@@ -513,7 +514,7 @@ test("sidebar card height - activeTranscript viewportHeight aligns card height t
 });
 
 
-test("sidebar tabs - switching to git tab renders 2 cards at 50/50 split without errors", () => {
+test("sidebar tabs - switching to git tab renders 2 cards at 50/50 split without errors", async () => {
 	resetAll();
 	const NODE = Symbol.for("@earendil-works/pi-tui/layout-node");
 
@@ -551,8 +552,11 @@ test("sidebar tabs - switching to git tab renders 2 cards at 50/50 split without
 		assert.ok(scrollEntry, "ScrollView rail entry must be mounted");
 
 		const layout = loadSolviLayout().sidebar;
+		scrollEntry.component.render(layout.railWidth); // cold start: kicks off async git refresh
+		await awaitGitIdle();
+		mockLayoutRoot[NODE](); // a real host re-lays out after requestRender; rebuild with warm git data
 		const railLines = scrollEntry.component.render(layout.railWidth);
-		assert.ok(railLines.length > 10, "Git tab rail must render lines");
+assert.ok(railLines.length > 10, "Git tab rail must render lines");
 
 		const joined = railLines.join("\n");
 		assert.ok(joined.includes("git graph"), "Git tab rail must render upper card 'git graph'");

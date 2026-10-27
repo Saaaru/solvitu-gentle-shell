@@ -1,6 +1,6 @@
 import test, { afterEach, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import * as cp from "node:child_process";
+import cp from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 import {
 	fetchGitFileChanges,
@@ -13,7 +13,7 @@ import {
 	resetGitBranchesCache,
 	resetGitGraphCache,
 } from "../src/solvi-git-graph.ts";
-import { awaitGitIdle, onGitDataChanged, setGitRunner, bindGitRenderHost } from "../src/git/git-swr.ts";
+import { awaitGitIdle, clearAllGitCaches, onGitDataChanged, setGitRunner, bindGitRenderHost } from "../src/git/git-swr.ts";
 
 const CWD = "/virtual/repo";
 
@@ -50,10 +50,7 @@ beforeEach(() => {
 	unsubscribe = onGitDataChanged(() => {
 		changes++;
 	});
-	resetGitFileChangesCache();
-	resetGitStatusCache();
-	resetGitBranchesCache();
-	resetGitGraphCache();
+	clearAllGitCaches();
 });
 
 afterEach(async () => {

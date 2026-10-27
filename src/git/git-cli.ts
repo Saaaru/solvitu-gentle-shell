@@ -1,5 +1,7 @@
-import * as cp from "node:child_process";
 import { readGitBranch } from "../solvi-paths.ts";
+import { createSwrStore, deepEqual, runGit } from "./git-swr.ts";
+
+const KEY_SEP = "\u0000";
 
 export interface GitStatusCounts {
 	staged: number;
@@ -66,66 +68,39 @@ export function parseGitStatusPorcelain(output: string): Omit<GitStatusCounts, "
 	return { staged, modified, untracked, conflicts, isClean };
 }
 
-export interface GitStatusCache {
-	counts: GitStatusCounts;
-	readAt: number;
-	cwd: string;
-}
+const EMPTY_STATUS: GitStatusCounts = {
+	staged: 0,
+	modified: 0,
+	untracked: 0,
+	conflicts: 0,
+	linesAdded: 0,
+	linesDeleted: 0,
+	isClean: true,
+};
 
-let cachedStatus: GitStatusCache | undefined;
-
-export function fetchGitStatus(cwd: string, ttlMs = 4000): GitStatusCounts {
-	const now = Date.now();
-	if (cachedStatus && cachedStatus.cwd === cwd && now - cachedStatus.readAt < ttlMs) {
-		return cachedStatus.counts;
-	}
-
-	try {
-		const output = cp.execFileSync("git", ["status", "--porcelain=v1"], {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "ignore"],
-			timeout: 1500,
-		});
-
+const statusStore = createSwrStore<GitStatusCounts>({
+	empty: () => EMPTY_STATUS,
+	equals: deepEqual,
+	load: async (cwd) => {
+		const output = await runGit(["status", "--porcelain=v1"], cwd, 1500);
 		let linesAdded = 0;
 		let linesDeleted = 0;
 		try {
-			const numstatOut = cp.execFileSync("git", ["diff", "HEAD", "--numstat"], {
-				cwd,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "ignore"],
-				timeout: 1500,
-			});
-			const numstat = parseGitNumstat(numstatOut);
+			const numstat = parseGitNumstat(await runGit(["diff", "HEAD", "--numstat"], cwd, 1500));
 			linesAdded = numstat.linesAdded;
 			linesDeleted = numstat.linesDeleted;
 		} catch {}
+		return { ...parseGitStatusPorcelain(output), linesAdded, linesDeleted };
+	},
+});
 
-		const counts: GitStatusCounts = {
-			...parseGitStatusPorcelain(output),
-			linesAdded,
-			linesDeleted,
-		};
-		cachedStatus = { counts, readAt: now, cwd };
-		return counts;
-	} catch {
-		const fallback: GitStatusCounts = {
-			staged: 0,
-			modified: 0,
-			untracked: 0,
-			conflicts: 0,
-			linesAdded: 0,
-			linesDeleted: 0,
-			isClean: true,
-		};
-		cachedStatus = { counts: fallback, readAt: now, cwd };
-		return fallback;
-	}
+/** Non-blocking: returns the cached (possibly stale) counts and refreshes in the background. */
+export function fetchGitStatus(cwd: string, ttlMs = 4000): GitStatusCounts {
+	return statusStore.get(cwd, ttlMs);
 }
 
 export function resetGitStatusCache(): void {
-	cachedStatus = undefined;
+	statusStore.invalidate();
 }
 
 export interface GitFileChange {
@@ -136,40 +111,14 @@ export interface GitFileChange {
 	linesDeleted: number;
 }
 
-export interface GitFileChangesCache {
-	files: GitFileChange[];
-	readAt: number;
-	cwd: string;
-}
-
-let cachedFileChanges: GitFileChangesCache | undefined;
-
-export function resetGitFileChangesCache(): void {
-	cachedFileChanges = undefined;
-}
-
-export function fetchGitFileChanges(cwd: string, ttlMs = 2000): GitFileChange[] {
-	const now = Date.now();
-	if (cachedFileChanges && cachedFileChanges.cwd === cwd && now - cachedFileChanges.readAt < ttlMs) {
-		return cachedFileChanges.files;
-	}
-
-	try {
-		const statusOut = cp.execFileSync("git", ["status", "--porcelain=v1"], {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "ignore"],
-			timeout: 1500,
-		});
-
+const fileChangesStore = createSwrStore<GitFileChange[]>({
+	empty: () => [],
+	equals: deepEqual,
+	load: async (cwd) => {
+		const statusOut = await runGit(["status", "--porcelain=v1"], cwd, 1500);
 		const numstatMap = new Map<string, { added: number; deleted: number }>();
 		try {
-			const numstatOut = cp.execFileSync("git", ["diff", "HEAD", "--numstat"], {
-				cwd,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "ignore"],
-				timeout: 1500,
-			});
+			const numstatOut = await runGit(["diff", "HEAD", "--numstat"], cwd, 1500);
 			for (const line of numstatOut.split("\n")) {
 				const parts = line.trim().split("\t");
 				if (parts.length >= 3) {
@@ -204,55 +153,39 @@ export function fetchGitFileChanges(cwd: string, ttlMs = 2000): GitFileChange[] 
 				linesDeleted: num.deleted,
 			});
 		}
-		cachedFileChanges = { files, readAt: now, cwd };
 		return files;
-	} catch {
-		cachedFileChanges = { files: [], readAt: now, cwd };
-		return [];
-	}
+	},
+});
+
+export function resetGitFileChangesCache(): void {
+	fileChangesStore.invalidate();
 }
 
-export interface GitGraphCache {
-	rawLines: string[];
-	readAt: number;
-	cwd: string;
+/** Non-blocking: returns the cached (possibly stale) list and refreshes in the background. */
+export function fetchGitFileChanges(cwd: string, ttlMs = 2000): GitFileChange[] {
+	return fileChangesStore.get(cwd, ttlMs);
 }
 
-let cachedGraph: GitGraphCache | undefined;
-
-export function fetchGitLogGraph(cwd: string, maxCommits = 20, ttlMs = 4000): string[] {
-	const now = Date.now();
-	if (cachedGraph && cachedGraph.cwd === cwd && now - cachedGraph.readAt < ttlMs) {
-		return cachedGraph.rawLines;
-	}
-
-	try {
-		const output = cp.execFileSync(
-			"git",
-			["log", "--graph", "--oneline", "--decorate", "-n", String(maxCommits)],
-			{
-				cwd,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "ignore"],
-				timeout: 2000,
-			},
-		);
-
-		const rawLines = output
+const graphStore = createSwrStore<string[]>({
+	empty: () => [],
+	equals: deepEqual,
+	load: async (key) => {
+		const [cwd, max] = key.split(KEY_SEP);
+		const output = await runGit(["log", "--graph", "--oneline", "--decorate", "-n", max], cwd, 2000);
+		return output
 			.replace(/\r\n/g, "\n")
 			.split("\n")
 			.filter((l) => l.trim().length > 0);
+	},
+});
 
-		cachedGraph = { rawLines, readAt: now, cwd };
-		return rawLines;
-	} catch {
-		cachedGraph = { rawLines: [], readAt: now, cwd };
-		return [];
-	}
+/** Non-blocking: returns the cached (possibly stale) graph lines and refreshes in the background. */
+export function fetchGitLogGraph(cwd: string, maxCommits = 20, ttlMs = 4000): string[] {
+	return graphStore.get(`${cwd}${KEY_SEP}${maxCommits}`, ttlMs);
 }
 
 export function resetGitGraphCache(): void {
-	cachedGraph = undefined;
+	graphStore.invalidate();
 }
 
 export function shortenRelativeTime(rel: string): string {
@@ -276,23 +209,11 @@ export interface GitBranchItem {
 	relativeDate?: string;
 }
 
-interface GitBranchesCache {
-	branches: GitBranchItem[];
-	readAt: number;
-	cwd: string;
-}
-
-let cachedBranches: GitBranchesCache | undefined;
-
-export function fetchGitBranches(cwd: string, ttlMs = 3000): GitBranchItem[] {
-	const now = Date.now();
-	if (cachedBranches && cachedBranches.cwd === cwd && now - cachedBranches.readAt < ttlMs) {
-		return cachedBranches.branches;
-	}
-
-	try {
-		const out = cp.execFileSync(
-			"git",
+const branchesStore = createSwrStore<GitBranchItem[]>({
+	empty: (cwd) => [{ name: readGitBranch(cwd), isCurrent: true, isRemote: false }],
+	equals: deepEqual,
+	load: async (cwd) => {
+		const out = await runGit(
 			[
 				"for-each-ref",
 				"--sort=-committerdate",
@@ -300,12 +221,8 @@ export function fetchGitBranches(cwd: string, ttlMs = 3000): GitBranchItem[] {
 				"refs/heads/",
 				"refs/remotes/",
 			],
-			{
-				cwd,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "ignore"],
-				timeout: 2000,
-			},
+			cwd,
+			2000,
 		);
 
 		const currentBranch = readGitBranch(cwd);
@@ -365,23 +282,22 @@ export function fetchGitBranches(cwd: string, ttlMs = 3000): GitBranchItem[] {
 			return 0;
 		});
 
-		const result = [...localBranches, ...remoteOnlyBranches];
-		cachedBranches = { branches: result, readAt: now, cwd };
-		return result;
-	} catch {
-		const fallback: GitBranchItem[] = [{ name: readGitBranch(cwd), isCurrent: true, isRemote: false }];
-		cachedBranches = { branches: fallback, readAt: now, cwd };
-		return fallback;
-	}
+		return [...localBranches, ...remoteOnlyBranches];
+	},
+});
+
+/** Non-blocking: returns the cached (possibly stale) branches and refreshes in the background. */
+export function fetchGitBranches(cwd: string, ttlMs = 3000): GitBranchItem[] {
+	return branchesStore.get(cwd, ttlMs);
 }
 
 export function resetGitBranchesCache(): void {
-	cachedBranches = undefined;
+	branchesStore.invalidate();
 }
 
 /**
  * Returns a concise sync badge for the current Git branch (e.g. "▲1", "▼2", "▲1▼2" or "").
- * Uses cached branch information with 3-second TTL for zero render overhead.
+ * Reads cached branch information (async stale-while-revalidate); never spawns in the render path.
  */
 export function getGitSyncBadge(cwd: string = process.cwd()): string {
 	try {
@@ -417,52 +333,33 @@ export interface BranchDiffSummary {
 	totalDeleted: number;
 }
 
-interface BranchDiffCache {
-	summary: BranchDiffSummary;
-	readAt: number;
-	key: string;
-}
-
-let cachedBranchDiff: BranchDiffCache | undefined;
-
-export function fetchBranchDiff(cwd: string, targetBranch: string, ttlMs = 3000): BranchDiffSummary {
-	const current = readGitBranch(cwd);
-	const key = `${cwd}::${current}::${targetBranch}`;
-	const now = Date.now();
-	if (cachedBranchDiff && cachedBranchDiff.key === key && now - cachedBranchDiff.readAt < ttlMs) {
-		return cachedBranchDiff.summary;
-	}
-
-	try {
+const branchDiffStore = createSwrStore<BranchDiffSummary>({
+	empty: (key) => {
+		const [, current, target] = key.split(KEY_SEP);
+		return { branch: target, baseBranch: current, files: [], totalAdded: 0, totalDeleted: 0 };
+	},
+	equals: deepEqual,
+	load: async (key) => {
+		const [cwd, current, targetBranch] = key.split(KEY_SEP);
 		let numstatOut = "";
 		let isDirectDiff = false;
 		try {
-			numstatOut = cp.execFileSync("git", ["diff", `HEAD...${targetBranch}`, "--numstat"], {
-				cwd,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "ignore"],
-				timeout: 2500,
-			});
+			numstatOut = await runGit(["diff", `HEAD...${targetBranch}`, "--numstat"], cwd, 2500);
 		} catch {}
 
 		if (!numstatOut.trim()) {
 			try {
-				numstatOut = cp.execFileSync("git", ["diff", "HEAD", targetBranch, "--numstat"], {
-					cwd,
-					encoding: "utf8",
-					stdio: ["ignore", "pipe", "ignore"],
-					timeout: 2500,
-				});
+				numstatOut = await runGit(["diff", "HEAD", targetBranch, "--numstat"], cwd, 2500);
 				isDirectDiff = true;
 			} catch {}
 		}
 
 		let nameStatusOut = "";
 		try {
-			nameStatusOut = cp.execFileSync(
-				"git",
+			nameStatusOut = await runGit(
 				isDirectDiff ? ["diff", "HEAD", targetBranch, "--name-status"] : ["diff", `HEAD...${targetBranch}`, "--name-status"],
-				{ cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2500 },
+				cwd,
+				2500,
 			);
 		} catch {}
 
@@ -472,9 +369,7 @@ export function fetchBranchDiff(cwd: string, targetBranch: string, ttlMs = 3000)
 			if (!trimmed) continue;
 			const parts = trimmed.split(/\s+/);
 			if (parts.length >= 2) {
-				const code = parts[0];
-				const filePath = parts.slice(1).join(" ");
-				statusMap.set(filePath, code);
+				statusMap.set(parts.slice(1).join(" "), parts[0]);
 			}
 		}
 
@@ -506,28 +401,16 @@ export function fetchBranchDiff(cwd: string, targetBranch: string, ttlMs = 3000)
 			}
 		}
 
-		const summary: BranchDiffSummary = {
-			branch: targetBranch,
-			baseBranch: current,
-			files,
-			totalAdded,
-			totalDeleted,
-		};
-		cachedBranchDiff = { summary, readAt: now, key };
-		return summary;
-	} catch {
-		const fallback: BranchDiffSummary = {
-			branch: targetBranch,
-			baseBranch: current,
-			files: [],
-			totalAdded: 0,
-			totalDeleted: 0,
-		};
-		cachedBranchDiff = { summary: fallback, readAt: now, key };
-		return fallback;
-	}
+		return { branch: targetBranch, baseBranch: current, files, totalAdded, totalDeleted };
+	},
+});
+
+/** Non-blocking: returns the cached (possibly stale) diff and refreshes in the background. */
+export function fetchBranchDiff(cwd: string, targetBranch: string, ttlMs = 3000): BranchDiffSummary {
+	const current = readGitBranch(cwd);
+	return branchDiffStore.get([cwd, current, targetBranch].join(KEY_SEP), ttlMs);
 }
 
 export function resetBranchDiffCache(): void {
-	cachedBranchDiff = undefined;
+	branchDiffStore.invalidate();
 }

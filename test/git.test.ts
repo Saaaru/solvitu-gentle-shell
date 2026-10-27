@@ -30,6 +30,7 @@ import { readGitBranch } from "../src/solvi-paths.ts";
 import { invalidateSidebarGitAndTree } from "../src/footer.ts";
 import { sidebarState } from "../src/sidebar.ts";
 import { resetAll } from "./test-helpers.ts";
+import { awaitGitIdle } from "../src/git/git-swr.ts";
 
 test("solvi-git-graph - colorizeGitGraphLine styles graph edges, hashes and branch refs in Dracula", () => {
 	const mockTheme = {
@@ -52,7 +53,7 @@ test("solvi-git-graph - colorizeGitGraphLine styles graph edges, hashes and bran
 	assert.ok(coloredCommit.includes("[text]Merge PR #73[/text]"), "commit subject should be styled in text");
 });
 
-test("solvi-git-graph - WorkspaceGitGraphCard interactive expansion toggle and rendering", () => {
+test("solvi-git-graph - WorkspaceGitGraphCard interactive expansion toggle and rendering", async () => {
 	const mockTheme = {
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	} as any;
@@ -74,6 +75,8 @@ test("solvi-git-graph - WorkspaceGitGraphCard interactive expansion toggle and r
 	assert.equal(card.isExpanded(), true);
 
 	// Render expanded (wide width for mock theme tags)
+	card.render(220); // cold start renders empty defaults and kicks off background refreshes
+	await awaitGitIdle();
 	const expandedLines = card.render(220);
 	assert.ok(expandedLines.length >= 5, "Expanded graph should have top, spacers, branch, tree, and bottom");
 	assert.ok(expandedLines[0].includes("git graph"), "Top bar should contain title 'git graph'");
@@ -108,7 +111,7 @@ test("solvi-git-graph - WorkspaceGitGraphCard interactive expansion toggle and r
 	card.invalidate();
 });
 
-test("solvi-git-graph - renders session changes below branches when present on sidebarState", () => {
+test("solvi-git-graph - renders session changes below branches when present on sidebarState", async () => {
 	const mockTheme = {
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	} as any;
@@ -131,6 +134,8 @@ test("solvi-git-graph - renders session changes below branches when present on s
 	const card = new WorkspaceGitGraphCard(mockCtx, mockTui, mockTheme);
 	card.setExpanded(true);
 
+	card.render(50);
+	await awaitGitIdle();
 	const lines = card.render(50);
 	const joined = lines.join("\n");
 	assert.ok(joined.includes("16 files · +990 −42"), "Card should render session changes row below branches");
@@ -231,7 +236,7 @@ test("solvi-git-graph - WorkspaceWorkingTreeCard rendering and toggle", () => {
 });
 
 
-test("solvi-git-graph - branches view and branch selection toggle", () => {
+test("solvi-git-graph - branches view and branch selection toggle", async () => {
 	resetAll();
 	// Builds its own temp repo with a second, diverged branch instead of relying on the
 	// solvitu repo having >=2 local branches with a real diff between them at test time.
@@ -249,6 +254,8 @@ test("solvi-git-graph - branches view and branch selection toggle", () => {
 		cp.execFileSync("git", ["commit", "-am", "feature change"], { cwd, stdio: "ignore" });
 		cp.execFileSync("git", ["checkout", "-"], { cwd, stdio: "ignore" }); // back to the original branch
 
+		fetchGitBranches(cwd);
+		await awaitGitIdle();
 		const branches = fetchGitBranches(cwd);
 		assert.ok(Array.isArray(branches), "fetchGitBranches must return an array");
 		assert.equal(branches.length, 2, "There should be exactly two local branches in the fixture repo");
@@ -270,6 +277,8 @@ test("solvi-git-graph - branches view and branch selection toggle", () => {
 		assert.equal(renderRequested, 1);
 
 		// Render branches view
+		card.render(50, 20);
+		await awaitGitIdle();
 		const lines = card.render(50, 20);
 		assert.equal(lines.length, 20, "Fixed height with availableHeight=20 should return exactly 20 lines");
 		const joined = lines.join("\n");
@@ -283,6 +292,8 @@ test("solvi-git-graph - branches view and branch selection toggle", () => {
 		assert.equal(renderRequested, 2);
 
 		// Re-rendering in branches view shows 'diff' indicator for the diverged selected branch
+		card.render(50, 20);
+		await awaitGitIdle();
 		const selectedLines = card.render(50, 20);
 		assert.ok(selectedLines.some((l) => l.includes("diff")), "Selected branch should have diff badge");
 
@@ -294,6 +305,7 @@ test("solvi-git-graph - branches view and branch selection toggle", () => {
 		setGitTabViewMode("graph", mockTui);
 		assert.equal(getGitTabViewMode(), "graph");
 	} finally {
+		await awaitGitIdle();
 		fs.rmSync(cwd, { recursive: true, force: true });
 	}
 });
@@ -361,7 +373,7 @@ test("solvi-git-graph - WorkspaceWorkingTreeCard file clicking and launchFileDif
 });
 
 
-test("solvi-git-graph - fetchGitFileChanges respects TTL cache and invalidation", () => {
+test("solvi-git-graph - fetchGitFileChanges respects TTL cache and invalidation", async () => {
 	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-git-cache-"));
 	try {
 		cp.execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
@@ -375,6 +387,8 @@ test("solvi-git-graph - fetchGitFileChanges respects TTL cache and invalidation"
 		fs.writeFileSync(path.join(tempDir, "file1.txt"), "hello world", "utf8");
 		resetGitFileChangesCache();
 
+		assert.deepEqual(fetchGitFileChanges(tempDir, 5000), [], "cold start serves the empty default");
+		await awaitGitIdle();
 		const firstCall = fetchGitFileChanges(tempDir, 5000);
 		assert.equal(firstCall.length, 1);
 		assert.equal(firstCall[0].path, "file1.txt");
@@ -388,6 +402,8 @@ test("solvi-git-graph - fetchGitFileChanges respects TTL cache and invalidation"
 
 		// Resetear caché
 		resetGitFileChangesCache();
+		fetchGitFileChanges(tempDir, 5000);
+		await awaitGitIdle();
 		const freshCall = fetchGitFileChanges(tempDir, 5000);
 		assert.equal(freshCall.length, 2, "Luego de resetear caché debe ver los 2 archivos");
 
@@ -395,8 +411,11 @@ test("solvi-git-graph - fetchGitFileChanges respects TTL cache and invalidation"
 		fs.writeFileSync(path.join(tempDir, "file3.txt"), "third file", "utf8");
 		assert.equal(fetchGitFileChanges(tempDir, 5000).length, 2, "Aún en caché debe ver 2");
 		invalidateSidebarGitAndTree();
+		assert.equal(fetchGitFileChanges(tempDir, 5000).length, 2, "Stale value is served while the refresh runs");
+		await awaitGitIdle();
 		assert.equal(fetchGitFileChanges(tempDir, 5000).length, 3, "Tras invalidateSidebarGitAndTree debe ver 3");
 	} finally {
+		await awaitGitIdle();
 		fs.rmSync(tempDir, { recursive: true, force: true });
 	}
 });
