@@ -11,7 +11,7 @@ import { syncProjectCloud, detectProjectName } from "./src/solvi-engram.ts";
 import { SolviContextMonitor } from "./src/solvi-context-monitor.ts";
 import { installWelcomeBanner } from "./src/welcome.ts";
 import { installWorkspaceStatuses } from "./src/statuses.ts";
-import { COMPACT_TOOLS, compactToolRenderer } from "./src/tool-lines.ts";
+import { resolveSolviToolRenderer, setExpandHint } from "./src/tool-card.ts";
 import { ensureCliProxyApiRunning } from "./src/cliproxy-autostart.ts";
 import { setCapabilityOverrides } from "@earendil-works/pi-tui";
 
@@ -29,11 +29,18 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	// 0. Context Threshold Notifications Monitor
 	const contextMonitor = new SolviContextMonitor();
 
-	// Compact tool lines: read, write, edit, bash, grep, find and ls draw as "name > target" without a card.
-	// Resolvers run in load order; this package loads after gentle-pi, so its resolver sees the call first.
+	// Uniform tool cards: every tool (built-in, MCP, unknown) draws a colored header, a short preview and a
+	// "... (K more lines, ctrl+o to expand)" hint; the full output is only formatted once Pi flips `expanded`.
+	// Resolvers run in load order and this package loads after gentle-pi, so ours wins unless it defers via next().
 	const host = pi as typeof pi & { registerToolRenderer?: (resolver: (toolName: string, next: () => unknown) => unknown) => void };
 	if (typeof host.registerToolRenderer === "function") {
-		host.registerToolRenderer((toolName, next) => (COMPACT_TOOLS.has(toolName) ? compactToolRenderer(toolName) : next()));
+		host.registerToolRenderer((toolName, next) => resolveSolviToolRenderer(toolName, next));
+		// Follow the user's own key binding for the expand hint when Pi exposes it.
+		import("@earendil-works/pi-coding-agent")
+			.then((mod: any) => {
+				if (typeof mod?.keyHint === "function") setExpandHint(() => mod.keyHint("app.tools.expand", "to expand"));
+			})
+			.catch(() => {});
 	}
 
 	// Alt+H / Alt+L move between sidebar tabs; Alt+Left / Alt+Right do the same (see src/sidebar-arrow-keys.ts)

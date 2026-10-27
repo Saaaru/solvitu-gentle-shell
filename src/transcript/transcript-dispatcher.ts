@@ -34,12 +34,8 @@ import {
 	readAssistantCard,
 	storeAssistantCard,
 } from "./transcript-assistant-cache.ts";
-import {
-	collapsedToolLine,
-	isToolExpanded,
-	PathLinkMouseProxy,
-	ToolToggleMouseProxy,
-} from "./transcript-interactive.ts";
+import { PathLinkMouseProxy } from "./transcript-interactive.ts";
+import { isSolviCardComponent } from "../tool-card.ts";
 
 /**
  * Checks whether a transcript component is a bash execution.
@@ -115,6 +111,9 @@ export function formatTranscriptChild(
 		const rawLines = child.render(width - 4);
 		return frameCategoryBox(rawLines, `🐝 ${user}`, colors.userMessage, width, theme);
 	}
+
+	// Solvitu tool cards are already formatted by their own renderer: never frame or restyle them again.
+	if (isSolviCardComponent(child)) return child.render(width);
 
 	// Bash execution (single child fallback)
 	if (isBashComponent(child)) {
@@ -207,12 +206,6 @@ export function formatTranscriptChild(
 	return transformTranscriptLines(unwrapped, theme);
 }
 
-/** First non-blank plain line of a tool result, used as the target of a collapsed card. */
-function firstContentLine(lines: string[]): string {
-	const first = lines.map((line) => stripAnsi(line).trim()).find((line) => line.length > 0);
-	return first ?? "";
-}
-
 /** Drops leading and trailing blank lines so line indexes match the framed card body. */
 function trimBlankLines(lines: string[]): string[] {
 	const out = [...lines];
@@ -242,19 +235,6 @@ export function formatTranscriptChildren(
 		}
 	};
 
-	// Tool cards start as one line (title and target); a click expands the framed card.
-	const pushToolCard = (child: Component, boxed: string[], title: string, toneKey: string, target: string) => {
-		if (isToolExpanded(child)) {
-			const forward = new FramedCardMouseProxy(child, boxed.length);
-			mouseChildren.push({ component: new ToolToggleMouseProxy(child, forward, true), height: boxed.length });
-			lines.push(...boxed);
-			return;
-		}
-		const summary = collapsedToolLine(title, target, width);
-		mouseChildren.push({ component: new ToolToggleMouseProxy(child), height: 1 });
-		lines.push(theme ? safeFg(theme, toneKey, summary) : summary);
-	};
-
 	let i = 0;
 	while (i < children.length) {
 		const child = children[i];
@@ -267,6 +247,16 @@ export function formatTranscriptChildren(
 			const boxed = frameCategoryBox(rawLines, `🐝 ${user}`, colors.userMessage, width, theme);
 			mouseChildren.push({ component: child, height: boxed.length });
 			lines.push(...boxed);
+			i++;
+			continue;
+		}
+
+		// 1b. Tool cards drawn by the Solvitu renderer (collapsed preview or expanded output) pass through as is.
+		// Pi's own component keeps the clicks, so a click and ctrl+o both go through Pi's expanded flag.
+		if (isSolviCardComponent(child)) {
+			const cardLines = child.render(width);
+			mouseChildren.push({ component: child, height: cardLines.length });
+			lines.push(...cardLines);
 			i++;
 			continue;
 		}
@@ -323,52 +313,6 @@ export function formatTranscriptChildren(
 			continue;
 		}
 
-		// 3. Read tool execution in soft lilac card with Dracula highlighting
-		if (isReadComponent(child)) {
-			ensureBreathingRoom();
-			const rawLines = child.render(width - 4);
-			const unwrapped = unwrapNativeCard(rawLines);
-			const styled = formatReadLines(unwrapped, toolFilePath(child, unwrapped), theme);
-			const boxed = frameCategoryBox(styled, "\u270E read", colors.readMessage, width, theme);
-			pushToolCard(child, boxed, "\u270E read", colors.readMessage, toolFilePath(child, unwrapped) ?? "");
-			i++;
-			continue;
-		}
-
-		// 4. Write / edit tool execution in barely-blue card
-		if (isWriteComponent(child)) {
-			ensureBreathingRoom();
-			const rawLines = child.render(width - 4);
-			const unwrapped = unwrapNativeCard(rawLines);
-			const styled = formatWriteDiffLines(unwrapped, toolFilePath(child, unwrapped), theme, (child as any).toolName);
-			const boxed = frameCategoryBox(styled, "\u270E write", colors.writeMessage, width, theme);
-			pushToolCard(child, boxed, "\u270E write", colors.writeMessage, toolFilePath(child, unwrapped) ?? "");
-			i++;
-			continue;
-		}
-
-		// 4b. Fetch tool execution in pink card; inner dark background preserved
-		if (isFetchComponent(child)) {
-			ensureBreathingRoom();
-			const rawLines = child.render(width - 4);
-			const unwrapped = unwrapNativeCard(rawLines);
-			const boxed = frameCategoryBox(unwrapped, "fetch", colors.fetchMessage, width, theme);
-			pushToolCard(child, boxed, "fetch", colors.fetchMessage, firstContentLine(unwrapped));
-			i++;
-			continue;
-		}
-
-		// 4c. Search tool execution in dusty-rose card; inner dark background preserved
-		if (isSearchComponent(child)) {
-			ensureBreathingRoom();
-			const rawLines = child.render(width - 4);
-			const unwrapped = unwrapNativeCard(rawLines);
-			const boxed = frameCategoryBox(unwrapped, "search", colors.searchMessage, width, theme);
-			pushToolCard(child, boxed, "search", colors.searchMessage, firstContentLine(unwrapped));
-			i++;
-			continue;
-		}
-
 		if (isReviewComponent(child)) {
 			ensureBreathingRoom();
 			const rawLines = child.render(width - 4);
@@ -379,68 +323,6 @@ export function formatTranscriptChildren(
 			mouseChildren.push({ component: new FramedCardMouseProxy(child, boxed.length), height: boxed.length });
 			lines.push(...boxed);
 			i++;
-			continue;
-		}
-
-		// 4d. Group consecutive memory (Engram) calls into ONE single salmon card
-		if (isMemoryComponent(child)) {
-			ensureBreathingRoom();
-			const memGroup: Component[] = [];
-			while (i < children.length) {
-				const curr = children[i];
-				if (isMemoryComponent(curr)) {
-					memGroup.push(curr);
-					i++;
-				} else if (isSpacer(curr) && i + 1 < children.length && isMemoryComponent(children[i + 1])) {
-					mouseChildren.push({ component: curr, height: 0 });
-					i++;
-				} else {
-					break;
-				}
-			}
-
-			const combinedLines: string[] = [];
-			for (const comp of memGroup) {
-				const raw = comp.render(width - 4);
-				const unwrapped = unwrapNativeCard(raw);
-				if (combinedLines.length > 0) {
-					combinedLines.push("");
-				}
-				const styled = formatMemoryOutputLines(unwrapped, theme);
-				combinedLines.push(...styled);
-			}
-
-			const hasMemoryTool = memGroup.some(
-				(c) => typeof (c as any)?.toolName === "string" && (c as any).toolName.startsWith("memory_"),
-			);
-			const hasEngramTool = memGroup.some(
-				(c) => typeof (c as any)?.toolName === "string" && (c as any).toolName.startsWith("mem_"),
-			);
-			const memCardTitle =
-				hasMemoryTool && !hasEngramTool
-					? "🧠 memory"
-					: hasEngramTool && !hasMemoryTool
-						? "🧠 engram"
-						: "🧠 memory";
-
-			const cardLines = frameCategoryBox(
-				combinedLines.length ? combinedLines : [memCardTitle.replace("🧠 ", "")],
-				memCardTitle,
-				colors.memoryMessage,
-				width,
-				theme,
-			);
-
-			const avgHeight = Math.max(1, Math.floor(cardLines.length / memGroup.length));
-			for (let j = 0; j < memGroup.length; j++) {
-				const compHeight =
-					j === memGroup.length - 1
-						? cardLines.length - avgHeight * (memGroup.length - 1)
-						: avgHeight;
-				mouseChildren.push({ component: memGroup[j], height: compHeight });
-			}
-
-			lines.push(...cardLines);
 			continue;
 		}
 
@@ -553,18 +435,6 @@ export function formatTranscriptChildren(
 			}
 
 			lines.push(...cardLines);
-			continue;
-		}
-
-		// 6. Grep tool execution (free, no card, Dracula highlighted)
-		if (isGrepComponent(child)) {
-			ensureBreathingRoom();
-			const rawLines = child.render(width);
-			const unwrapped = unwrapNativeCard(rawLines);
-			const styled = formatGrepLines(unwrapped, theme);
-			mouseChildren.push({ component: child, height: styled.length });
-			lines.push(...styled);
-			i++;
 			continue;
 		}
 

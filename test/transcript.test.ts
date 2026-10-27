@@ -44,6 +44,7 @@ import {
 	extractReviewHeader,
 	formatReviewOutputLines,
 } from "../src/solvi-transcript.ts";
+import { solviToolRenderer } from "../src/tool-card.ts";
 import { isHerdrSession, resolveEdgeInsets, tuneTuiScroll, resetSolviLayoutCache, loadSolviLayout } from "../src/solvi-layout.ts";
 import { resetAll, userConfigFile } from "./test-helpers.ts";
 
@@ -532,15 +533,20 @@ test("isMemoryComponent - matches mem_ and memory_ tools", () => {
 	assert.equal(isMemoryComponent(null as any), false);
 });
 
-test("formatTranscriptChildren - groups consecutive memory calls into ONE single salmon card", () => {
+test("formatTranscriptChildren - memory calls are individual Solvitu cards, no longer grouped into one framed card", () => {
 	const mockTheme = {
 		fg: (role: string, text: string) => `[${role}]${text}[/${role}]`,
 	} as any;
 	class MemTool {
 		toolName: string;
-		msg: string;
-		constructor(toolName: string, msg: string) { this.toolName = toolName; this.msg = msg; }
-		render() { return [this.msg]; }
+		toolDefinition: unknown;
+		cardLines: string[];
+		constructor(toolName: string, msg: string) {
+			this.toolName = toolName;
+			this.toolDefinition = solviToolRenderer(toolName);
+			this.cardLines = ["", msg];
+		}
+		render() { return this.cardLines; }
 	}
 	class AssistantMessageComponent {
 		render() { return ["plain prose stays free"]; }
@@ -552,14 +558,12 @@ test("formatTranscriptChildren - groups consecutive memory calls into ONE single
 		new MemTool("mem_doctor", "doctor ok"),
 	];
 	const { lines, mouseChildren } = formatTranscriptChildren(children, 70, mockTheme);
-	const headers = lines.filter((l) => l.includes("engram"));
-	assert.equal(headers.length, 2, "2 salmon engram cards: 1 grouped (2 calls) + 1 single");
-	assert.ok(headers[0].includes("[salmon]"));
+	assert.ok(!lines.some((l) => l.includes("engram")), "no grouped engram frame around memory cards");
 	const cardSlice = lines.join("\n");
 	assert.ok(cardSlice.includes("search supabase..."));
-	assert.ok(cardSlice.includes("timeline #") && cardSlice.includes("[syntaxNumber]1624[/syntaxNumber]"));
+	assert.ok(cardSlice.includes("timeline #1624"), "card lines pass through unmodified");
 	assert.ok(cardSlice.includes("plain prose stays free"));
-	assert.ok(mouseChildren.length >= children.length, "All children must be mapped in mouseLayout with spacers");
+	assert.equal(mouseChildren.filter((m) => m.component === children[0] || m.component === children[1] || m.component === children[3]).length, 3, "each card keeps its own mouse target");
 });
 
 test("transformTranscriptLines - bolds markdown headings, leaves code fences alone", () => {
