@@ -29,6 +29,12 @@ import {
 } from "./transcript-tools-special.ts";
 import { formatAssistantProse } from "./transcript-prose.ts";
 import {
+	assistantCardKey,
+	assistantFingerprint,
+	readAssistantCard,
+	storeAssistantCard,
+} from "./transcript-assistant-cache.ts";
+import {
 	collapsedToolLine,
 	isToolExpanded,
 	PathLinkMouseProxy,
@@ -564,6 +570,23 @@ export function formatTranscriptChildren(
 
 		// 7. Assistant prose and other components
 		ensureBreathingRoom();
+		const assistantTitle = `\u{1F916} ${strings.welcomePersona.name || "assistant"}`;
+		const assistantTone = colors.assistantMessage ?? "gentle";
+		let assistantKey: string | undefined;
+		if (name === "AssistantMessageComponent") {
+			// A finished message does not change between frames: reuse its card instead of rendering it again.
+			const fingerprint = assistantFingerprint(child);
+			if (fingerprint) {
+				assistantKey = assistantCardKey(fingerprint, width, theme, assistantTitle, assistantTone);
+				const hit = readAssistantCard(child, assistantKey);
+				if (hit) {
+					mouseChildren.push({ component: hit.proxy, height: hit.boxed.length });
+					lines.push(...hit.boxed);
+					i++;
+					continue;
+				}
+			}
+		}
 		const rawLines = child.render(width);
 		if (isAsciiArtOrBanner(rawLines)) {
 			mouseChildren.push({ component: child, height: rawLines.length });
@@ -574,9 +597,10 @@ export function formatTranscriptChildren(
 
 		if (name === "AssistantMessageComponent") {
 			const prose = trimBlankLines(formatAssistantProse(rawLines, theme, width));
-			const title = `\u{1F916} ${strings.welcomePersona.name || "assistant"}`;
-			const boxed = frameCategoryBox(prose, title, colors.assistantMessage ?? "gentle", width, theme);
-			mouseChildren.push({ component: new PathLinkMouseProxy(prose), height: boxed.length });
+			const boxed = frameCategoryBox(prose, assistantTitle, assistantTone, width, theme);
+			const proxy = new PathLinkMouseProxy(prose);
+			if (assistantKey) storeAssistantCard(child, assistantKey, { boxed, prose, proxy });
+			mouseChildren.push({ component: proxy, height: boxed.length });
 			lines.push(...boxed);
 			i++;
 			continue;

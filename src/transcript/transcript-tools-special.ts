@@ -16,7 +16,16 @@ export const SEARCH_HEADER_RE = new RegExp(`^${TOOL_GLYPH_PREFIX}search\\s+`, "i
 export const SUBAGENT_HEADER_RE = new RegExp(`^${TOOL_GLYPH_PREFIX}agent\\s+(?:status|run|result|reply|cancel|continue|list)`, "i");
 export const AGENT_STATUS_HEADER_RE = new RegExp(`^${TOOL_GLYPH_PREFIX}agent\\s+status\\b`, "i");
 
+/**
+ * Conversation components that are never tool executions. Detectors must not render them just to read a
+ * header: it costs a full extra render per frame and, at a different width than the real render, evicts
+ * the single-width cache inside Pi's Markdown component.
+ */
+const NON_TOOL_COMPONENTS = new Set(["AssistantMessageComponent", "UserMessageComponent", "Spacer"]);
+
 function tryRender(child: Component, width: number): string[] | undefined {
+	const name = (child as unknown as { constructor?: { name?: string } })?.constructor?.name ?? "";
+	if (NON_TOOL_COMPONENTS.has(name)) return undefined;
 	try {
 		return (child as unknown as { render?: (w: number) => string[] }).render?.(width);
 	} catch {
