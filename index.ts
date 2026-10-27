@@ -14,12 +14,18 @@ import { installWelcomeBanner } from "./src/welcome.ts";
 import { installWorkspaceStatuses } from "./src/statuses.ts";
 import { resolveSolviToolRenderer, setExpandHint } from "./src/tool-card.ts";
 import { ensureCliProxyApiRunning } from "./src/cliproxy-autostart.ts";
+import { syncBundledProfiles } from "./src/profiles/profile-sync.ts";
 import { setCapabilityOverrides } from "@earendil-works/pi-tui";
 
 export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	// Forzar soporte de Kitty graphics en entornos Ghostty / Kitty
 	try {
 		setCapabilityOverrides({ images: "kitty" });
+	} catch {}
+
+	// Seed bundled profiles into the global profiles dir (never overwrites, never throws)
+	try {
+		syncBundledProfiles();
 	} catch {}
 
 	// 0. Disable float background leaks from foreign gentle-shell cards
