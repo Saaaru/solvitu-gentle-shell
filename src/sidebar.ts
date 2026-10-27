@@ -22,7 +22,9 @@ import {
 } from "./sidebar-mouse.ts";
 import {
 	buildSidebarRailLines,
+	invalidateRailMemo,
 } from "./sidebar-rail-builder.ts";
+import { isSidebarVisible, onSidebarVisibilityChange } from "./sidebar-visibility.ts";
 import {
 	SOLVI_SIDEBAR_TABS,
 	SIDEBAR_TAB_CARD_MAP,
@@ -129,6 +131,20 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 	state.active = false;
 	state.ownsHost = () => !stopped && host.mode === "fullscreen" && !!host.layoutRoot && roots.has(host.layoutRoot);
 
+	// A toggle drops every width-dependent artifact so no rail line from the other layout survives.
+	cleanups.push(
+		onSidebarVisibilityChange(() => {
+			railLines = [];
+			sectionMappings = [];
+			tabHitboxes = [];
+			tabBarLineIndex = -1;
+			tabBarDividerLineIndex = -1;
+			invalidateRailMemo(state);
+			for (const part of state.parts.values()) part.invalidate();
+			tui.requestRender();
+		}),
+	);
+
 	const rail: Component = {
 		render: () => railLines,
 		invalidate() {
@@ -173,6 +189,8 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 		state.active = false;
 		const layout = loadSolviLayout().sidebar;
 		if (stopped || failed || host.mode !== "fullscreen" || width < layout.breakpoint) return false;
+		// Hidden: no rail build, no card renders, no dividers (the chat takes the full width).
+		if (!isSidebarVisible()) return false;
 		try {
 			const contentWidth = scroll.getContentWidth(layout.railWidth);
 			const result = buildSidebarRailLines({
@@ -349,7 +367,8 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 				const { left: insetLeft, right: insetRight } = resolveEdgeInsets(solvi.terminal);
 				const availColumns = Math.max(1, columns - insetLeft - insetRight);
 				const active = prepare(availColumns);
-				const hasLeftBorder = availColumns >= layout.minColumnsWithBorder;
+				const sidebarVisible = isSidebarVisible();
+				const hasLeftBorder = sidebarVisible && availColumns >= layout.minColumnsWithBorder;
 
 				if (active) {
 					// Con el middleDivider visible de arriba a abajo, ocultamos el scrollbar del transcript
@@ -366,7 +385,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 
 				const node: any = original.call(root);
 
-				if (!hasLeftBorder && !active && insetLeft === 0 && insetRight === 0) {
+				if (sidebarVisible && !hasLeftBorder && !active && insetLeft === 0 && insetRight === 0) {
 					return node;
 				}
 
