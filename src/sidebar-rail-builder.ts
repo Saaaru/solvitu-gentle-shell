@@ -71,6 +71,11 @@ interface RailMemo {
 
 const railMemos = new WeakMap<object, RailMemo>();
 
+/** Forgets the memoized rail for `state` (sidebar shown or hidden: the next build must start from scratch). */
+export function invalidateRailMemo(state: object): void {
+	railMemos.delete(state);
+}
+
 function sameLines(a: readonly string[], b: readonly string[]): boolean {
 	if (a === b) return true;
 	if (a.length !== b.length) return false;

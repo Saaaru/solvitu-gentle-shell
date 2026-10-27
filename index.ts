@@ -7,6 +7,7 @@ import { moveSelection, openSelected } from "./src/main-view.ts";
 import { registerTreeKeys } from "./src/tree/tree-keys.ts";
 import { registerSpotifyCommands } from "./src/spotify/spotify-commands.ts";
 import { registerSidebarArrowKeys } from "./src/sidebar-arrow-keys.ts";
+import { registerSidebarToggle } from "./src/sidebar-visibility.ts";
 import { syncProjectCloud, detectProjectName } from "./src/solvi-engram.ts";
 import { SolviContextMonitor } from "./src/solvi-context-monitor.ts";
 import { installWelcomeBanner } from "./src/welcome.ts";
@@ -89,6 +90,8 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	registerTreeKeys(pi);
 	registerSpotifyCommands(pi);
 	registerSidebarArrowKeys(pi);
+	// Alt+W and /sidebar show or hide the whole sidebar (Alt+B is Pi's cursorWordLeft, so it is not usable)
+	registerSidebarToggle(pi);
 
 	// Shows the bee until the first message, then hands the header slot to installWorkspaceHeader.
 	installWelcomeBanner(pi);
