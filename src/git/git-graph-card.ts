@@ -29,6 +29,20 @@ import {
 
 const SIDEBAR_STATE = Symbol.for("gentle-pi.experimental-sidebar.state");
 
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 1;
+
+/** Stable small id for an object, used to build cheap render keys from config objects. */
+export function idOf(value: unknown): number {
+	if (!value || typeof value !== "object") return 0;
+	let id = objectIds.get(value);
+	if (id === undefined) {
+		id = nextObjectId++;
+		objectIds.set(value, id);
+	}
+	return id;
+}
+
 /**
  * Interactive Git Graph card for the Workspace sidebar rail.
  * - Shows an interactive Dracula-styled git graph or branches list in the rail.
@@ -157,6 +171,40 @@ export class WorkspaceGitGraphCard implements Component {
 		resetGitBranchesCache();
 		resetBranchDiffCache();
 		resetGitFileChangesCache();
+	}
+
+	/**
+	 * Version signal for the rail builder: changes whenever anything `render` depends on changes, so an
+	 * unchanged key means the previous lines (and hitboxes) are still right. Runs every frame, so it also keeps
+	 * the stale-while-revalidate reads ticking exactly like `render` does.
+	 */
+	getRenderKey(width: number, availableHeight?: number): string | undefined {
+		const cfg = loadSolviLayout().gitGraph;
+		if (!cfg.enabled) return "off";
+		const cwd = this.ctx?.cwd ?? process.cwd();
+		const rawLines = fetchGitLogGraph(cwd, 30, cfg.ttlMs);
+		if (!rawLines.length) return "empty";
+		const status = fetchGitStatus(cwd, cfg.ttlMs);
+		const viewMode = getGitTabViewMode();
+		const parts: Array<string | number | boolean | null | undefined> = [
+			idOf(cfg),
+			idOf(loadSolviColors()),
+			idOf(solviGlyphs(this.theme)),
+			width,
+			availableHeight,
+			this.expanded,
+			this.scrollOffset,
+			viewMode,
+			readGitBranch(cwd),
+			rawLines.join("\n"),
+			JSON.stringify(status),
+		];
+		if (viewMode === "branches") {
+			parts.push(idOf(fetchGitBranches(cwd, 3000)), getGitTabSelectedBranch());
+		} else {
+			parts.push(this.getChangesRow(status, Math.max(cfg.minWidth, width) - 4));
+		}
+		return parts.join("\u0001");
 	}
 
 	render(width: number, availableHeight?: number): string[] {
