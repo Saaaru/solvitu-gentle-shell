@@ -4,7 +4,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { safeFg } from "./solvi-theme.ts";
 import { loadSolviColors } from "./solvi-colors.ts";
 import { compactToolTarget } from "./tool-lines.ts";
-import { truncateAnsiAware } from "./transcript/transcript-ansi.ts";
+import { calcVisibleWidth, truncateAnsiAware, truncateToVisibleWidth } from "./transcript/transcript-ansi.ts";
 import { toolFilePath } from "./transcript/transcript-highlight.ts";
 import {
 	formatBashOutputLines,
@@ -14,19 +14,24 @@ import {
 } from "./transcript/transcript-tools-system.ts";
 
 /**
- * One uniform, lazily expanding card for every tool call.
+ * One uniform, boxed, lazily expanding card for every tool call.
  *
- * Pi calls `renderCall` / `renderResult` when a call changes and whenever the expanded flag flips (ctrl+o or a
- * click), and calls the returned component's `render(width)` on every frame. So the expensive work (syntax
- * highlighting, wrapping) lives only on the expanded path, and the collapsed path slices a few lines out of the
- * raw text once per width and caches them.
+ * ┌─ ✎ read src/a.ts ─────────────────────────────┐
+ * └─ 40 lines · ctrl+o to expand ─────────────────┘
+ *
+ * Every tool (built-in, MCP, unknown) draws a double-line SOLVI frame in its category
+ * tone; the collapsed box shows only the header, and the bottom border carries the line
+ * count with the expand hint. The full output is formatted only once Pi flips `expanded`
+ * (ctrl+o or a click), so the expensive work (syntax highlighting, wrapping) lives only
+ * on the expanded path; the collapsed path counts lines and draws two borders.
  */
 
-/** Lines a collapsed card previews before the "... (K more lines)" hint. */
-export const COLLAPSED_PREVIEW_LINES = 5;
-/** Lines shown while a result is still streaming, collapsed or expanded. */
+/** Lines shown while a result is still streaming, collapsed. */
+const PARTIAL_PREVIEW_LINES = 3;
+/** Lines shown while a result is still streaming, expanded. */
 const PARTIAL_EXPANDED_LINES = 40;
-const INDENT = "  ";
+/** Minimum frame width: below this the border compresses instead of overflowing. */
+const MIN_FRAME_WIDTH = 24;
 
 /** Marks a renderer definition as ours so the transcript dispatcher can pass the finished card through. */
 export const SOLVI_CARD = Symbol.for("solvitu.tool-card");
@@ -117,21 +122,6 @@ function countLines(text: string): number {
 	return text.endsWith("\n") ? count - 1 : count;
 }
 
-function headLines(text: string, n: number): string[] {
-	const out: string[] = [];
-	let from = 0;
-	while (out.length < n && from <= text.length) {
-		const at = text.indexOf("\n", from);
-		if (at === -1) {
-			if (from < text.length) out.push(text.slice(from));
-			break;
-		}
-		out.push(text.slice(from, at));
-		from = at + 1;
-	}
-	return out;
-}
-
 function tailLines(text: string, n: number): string[] {
 	const body = text.endsWith("\n") ? text.slice(0, -1) : text;
 	const out: string[] = [];
@@ -166,7 +156,7 @@ class HeaderLine implements Component {
 
 	render(width: number): string[] {
 		if (this.cache?.width === width) return this.cache.lines;
-		const lines = [truncateAnsiAware(this.build(width), Math.max(1, width))];
+		const lines = [this.build(width)];
 		this.cache = { width, lines };
 		return lines;
 	}
@@ -197,15 +187,66 @@ class BodyLines implements Component {
 	}
 }
 
-function fit(line: string, width: number): string {
-	return truncateAnsiAware(INDENT + line, Math.max(1, width));
+// ---- SOLVI frame drawing ----
+
+/**
+ * Top border with the card header: `┌─ {title} {target} ────┐`.
+ * Width math runs on the plain strings before coloring, so the border always lands on
+ * exactly `width` visible columns; the target clips with an ellipsis, never the border.
+ */
+function frameTop(theme: Theme, tone: string, title: string, target: string, width: number): string {
+	const w = Math.max(MIN_FRAME_WIDTH, width);
+	const border = (s: string) => safeFg(theme, tone, s);
+	// "┌─ " (3) + title (+ " " + target) + " " (1) + fill + "┐" (1) = w
+	const titleRoom = w - 5;
+	let titleStr = title;
+	if (calcVisibleWidth(titleStr) > titleRoom) titleStr = truncateToVisibleWidth(titleStr, Math.max(0, titleRoom - 1)) + "…";
+	let targetStr = target;
+	const targetRoom = titleRoom - calcVisibleWidth(titleStr) - 1;
+	if (targetStr && calcVisibleWidth(targetStr) > targetRoom) {
+		targetStr = targetRoom > 1 ? truncateToVisibleWidth(targetStr, targetRoom - 1) + "…" : "";
+	}
+	const contentWidth = calcVisibleWidth(titleStr) + (targetStr ? 1 + calcVisibleWidth(targetStr) : 0);
+	const fill = Math.max(0, w - 5 - contentWidth);
+	return (
+		border("┌─ ") +
+		border(titleStr) +
+		(targetStr ? " " + safeFg(theme, "muted", targetStr, "dim") : "") +
+		border(" " + "─".repeat(fill) + "┐")
+	);
 }
 
-function hintLine(hidden: number, theme: Theme, width: number): string {
-	const label = hidden === 1 ? "line" : "lines";
-	const text =
-		safeFg(theme, "muted", `... (${hidden} more ${label}, `, "dim") + expandHint() + safeFg(theme, "muted", ")", "dim");
-	return fit(text, width);
+/**
+ * Bottom border with an optional muted label: `└─ {label} ────┘`, or a plain `└────┘`
+ * without one. The label is measured plain, so the border closes on exactly `width`.
+ */
+function frameBottom(theme: Theme, tone: string, label: string, width: number): string {
+	const w = Math.max(MIN_FRAME_WIDTH, width);
+	const border = (s: string) => safeFg(theme, tone, s);
+	if (!label) return border("└" + "─".repeat(w - 2) + "┘");
+	// "└─ " (3) + label + " " (1) + fill + "┘" (1) = w
+	const labelRoom = w - 5;
+	let labelStr = label;
+	if (calcVisibleWidth(labelStr) > labelRoom) labelStr = truncateToVisibleWidth(labelStr, Math.max(0, labelRoom - 1)) + "…";
+	const fill = Math.max(0, w - 5 - calcVisibleWidth(labelStr));
+	return border("└─ ") + safeFg(theme, "muted", labelStr, "dim") + border(" " + "─".repeat(fill) + "┘");
+}
+
+/** Content rows framed as `│ {row padded to width-4} │`, wrapped ANSI-aware. */
+function frameRows(rows: string[], theme: Theme, tone: string, width: number): string[] {
+	const w = Math.max(MIN_FRAME_WIDTH, width);
+	const inner = w - 4;
+	const border = (s: string) => safeFg(theme, tone, s);
+	const out: string[] = [];
+	for (const row of rows) {
+		const wrapped = wrapTextWithAnsi(row, inner);
+		const pieces = wrapped.length ? wrapped : [""];
+		for (let piece of pieces) {
+			if (calcVisibleWidth(piece) > inner) piece = truncateAnsiAware(piece, inner);
+			out.push(border("│ ") + piece + " ".repeat(Math.max(0, inner - calcVisibleWidth(piece))) + border(" │"));
+		}
+	}
+	return out;
 }
 
 export interface ToolCardRenderer {
@@ -215,7 +256,7 @@ export interface ToolCardRenderer {
 	[SOLVI_CARD]: true;
 }
 
-/** Renderer for one tool: colored header, a short preview collapsed, the fully formatted output expanded. */
+/** Renderer for one tool: a double-line SOLVI box, header only while collapsed, the fully formatted output expanded. */
 export function solviToolRenderer(toolName: string, formatters: CardFormatters = defaultCardFormatters): ToolCardRenderer {
 	const category = toolCategory(toolName);
 	const colors = loadSolviColors();
@@ -231,10 +272,7 @@ export function solviToolRenderer(toolName: string, formatters: CardFormatters =
 				const failed = context?.isError === true;
 				const tone = failed ? colors.errorMessage : category.tone;
 				const title = `${failed ? "✗" : category.glyph} ${toolName}`;
-				const target = toolCardTarget(toolName, args);
-				const room = Math.max(0, width - title.length - 1);
-				const clipped = target.length > room ? `${target.slice(0, Math.max(0, room - 1))}…` : target;
-				return safeFg(theme, tone, title) + (clipped ? ` ${safeFg(theme, "muted", clipped, "dim")}` : "");
+				return frameTop(theme, tone, title, toolCardTarget(toolName, args), width);
 			});
 		},
 
@@ -243,27 +281,28 @@ export function solviToolRenderer(toolName: string, formatters: CardFormatters =
 			const partial = options?.isPartial === true;
 			const failed = context?.isError === true;
 			const text = resultText(result);
-			const tone = failed ? colors.errorMessage : undefined;
-			const paint = (line: string) => (tone ? safeFg(theme, tone, line) : safeFg(theme, "toolOutput", line, "muted"));
+			const tone = failed ? colors.errorMessage : category.tone;
+			const paint = (line: string) => (failed ? safeFg(theme, tone, line) : safeFg(theme, "toolOutput", line, "muted"));
 
 			return new BodyLines((width) => {
-				if (!text) return [];
-				const room = Math.max(1, width - INDENT.length);
+				// No output yet: close the frame opened by the header.
+				if (!text) return [frameBottom(theme, tone, "", width)];
 
-				// Streaming: never format, never scan the whole text.
+				// Streaming: never format, never scan the whole text; a bounded tail peek keeps the box alive.
 				if (partial) {
-					const n = expanded ? PARTIAL_EXPANDED_LINES : COLLAPSED_PREVIEW_LINES;
-					return tailLines(text, n).map((line) => fit(paint(line), width));
+					const n = expanded ? PARTIAL_EXPANDED_LINES : PARTIAL_PREVIEW_LINES;
+					const rows = tailLines(text, n).map(paint);
+					return [...frameRows(rows, theme, tone, width), frameBottom(theme, tone, "streaming", width)];
 				}
 
+				// Collapsed: header only; the count and the expand hint travel in the bottom border.
 				if (!expanded) {
 					const total = countLines(text);
-					const shown = category.kind === "bash" && !failed ? tailLines(text, COLLAPSED_PREVIEW_LINES) : headLines(text, COLLAPSED_PREVIEW_LINES);
-					const out = shown.map((line) => fit(paint(line), width));
-					if (total > shown.length) out.push(hintLine(total - shown.length, theme, width));
-					return out;
+					const label = `${total} ${total === 1 ? "line" : "lines"} · ${expandHint()}`;
+					return [frameBottom(theme, tone, label, width)];
 				}
 
+				// Expanded: the full formatted output, framed row by row.
 				let source = text;
 				if (toolName === "edit" && typeof result?.details?.diff === "string") source = result.details.diff;
 				else if (toolName === "write" && typeof context?.state?.writeContent === "string") source = context.state.writeContent;
@@ -278,18 +317,13 @@ export function solviToolRenderer(toolName: string, formatters: CardFormatters =
 				else if (category.kind === "grep") formatted = formatters.grep(raw, theme);
 				else formatted = formatters.generic(raw, theme);
 
-				const out: string[] = [];
-				for (const line of formatted) {
-					const wrapped = wrapTextWithAnsi(line, room);
-					for (const piece of wrapped.length ? wrapped : [""]) out.push(INDENT + piece);
-				}
-				return out;
+				return [...frameRows(formatted, theme, tone, width), frameBottom(theme, tone, "", width)];
 			});
 		},
 	};
 }
 
-/** Resolver for Pi's `registerToolRenderer`: our card for every tool, except those with bespoke grouping. */
+/** Resolver for Pi's `registerToolRenderer`: our boxed card for every tool, except those with bespoke grouping. */
 export function resolveSolviToolRenderer<T>(toolName: string, next: () => T): ToolCardRenderer | T {
 	return isCardExcluded(toolName) ? next() : solviToolRenderer(toolName);
 }
