@@ -27,3 +27,10 @@ Remove the per-frame pre-render of collapsed cards; make ctrl+o and click work t
 - Memory (mem_*) calls are no longer merged into one framed card; each is its own card.
 - Expanded cards are indented, not boxed.
 - Legacy `formatTranscriptChild` (single child, exported API) keeps its old branches for components without a Solvitu renderer.
+
+## Evidence
+- RED: `node --test test/tool-card.test.ts` -> ERR_MODULE_NOT_FOUND src/tool-card.ts (pass 0, fail 1).
+- GREEN: 14 tests in test/tool-card.test.ts pass.
+- Baseline `npm test`: 270 tests, 269 pass, 1 fail (solvi-tree). After: 281 tests, 280 pass, 1 fail (solvi-tree).
+- Smoke: `pi -p --no-session --no-extensions -e <worktree> "call ls once..."` exited 0 and answered; no extension load errors. Print mode does not draw the TUI, so card rendering itself is verified by unit tests only (no interactive TUI check).
+- Commits: 90d1c3a feat(tools): uniform lazy-expanding Solvitu card for every tool.
