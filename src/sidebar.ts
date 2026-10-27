@@ -1,6 +1,7 @@
 import { ScrollView, type Component, type TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { solviGlyphs, safeFg, transformTranscriptLines } from "./solvi-theme.ts";
+import { themeStamp } from "./theme/theme-adapter.ts";
 import { formatTranscriptChildren } from "./solvi-transcript.ts";
 import { loadSolviLayout, resolveEdgeInsets, tuneTuiScroll } from "./solvi-layout.ts";
 import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
@@ -51,6 +52,29 @@ interface Host extends TUI {
 
 interface LayoutRoot extends Component {
 	[NODE]?: () => any;
+}
+
+const columnCaches = new WeakMap<object, Map<string, string[]>>();
+const NO_THEME = {};
+
+/**
+ * A column of `rows` identical lines (edge spacers, rail borders, middle divider). The array is rebuilt only
+ * when the row count, width, kind or theme paint changes; every other frame reuses the same array.
+ */
+export function filledColumn(kind: string, rows: number, width: number, theme: unknown, makeLine: () => string): string[] {
+	const owner = (theme && typeof theme === "object" ? theme : NO_THEME) as object;
+	let cache = columnCaches.get(owner);
+	if (!cache) {
+		cache = new Map();
+		columnCaches.set(owner, cache);
+	}
+	const key = kind + "|" + rows + "|" + width + "|" + themeStamp(theme as Theme);
+	const hit = cache.get(key);
+	if (hit) return hit;
+	if (cache.size > 24) cache.clear();
+	const column = Array(rows).fill(makeLine());
+	cache.set(key, column);
+	return column;
 }
 
 // Marker symbol to avoid double-wrapping layoutRoot
@@ -115,11 +139,11 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 	const leftBorder: Component = {
 		render(width: number) {
 			const rows = Math.max(1, tui.terminal?.rows ?? loadSolviLayout().sidebar.fallbackRows);
-			const line =
+			return filledColumn("left-border", rows, width, theme, () =>
 				width >= 2
 					? `${subtle(railV)}${" ".repeat(width - 1)}`
-					: subtle(railV);
-			return Array(rows).fill(line);
+					: subtle(railV),
+			);
 		},
 		invalidate() {},
 	};
@@ -299,11 +323,11 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 			const middleDivider: Component = {
 				render(width: number) {
 					const rows = Math.max(1, tui.terminal?.rows ?? loadSolviLayout().sidebar.fallbackRows);
-					const line =
+					return filledColumn("middle-divider", rows, width, theme, () =>
 						width >= 2
 							? `${" ".repeat(width - 1)}${subtle(railV)}`
-							: subtle(railV);
-					return Array(rows).fill(line);
+							: subtle(railV),
+					);
 				},
 				invalidate() {},
 			};
@@ -371,7 +395,7 @@ export function installSidebar(tui: TUI, theme?: Theme): () => void {
 				}
 
 				const edgeSpacer = (): Component => ({
-					render: (w: number) => Array(tui.terminal.rows).fill(" ".repeat(w)),
+					render: (w: number) => filledColumn("edge-spacer", tui.terminal.rows, w, theme, () => " ".repeat(w)),
 					invalidate: () => {},
 				});
 

@@ -13,6 +13,7 @@ import {
 	resetBranchDiffCache,
 } from "./git-cli.ts";
 import { getGitTabSelectedBranch, setGitTabSelectedBranch } from "./git-state.ts";
+import { idOf } from "./git-graph-card.ts";
 import { formatFilePathWithDracula } from "./git-styles.ts";
 import { launchGitDiff, launchFileDiff } from "./git-launchers.ts";
 
@@ -116,6 +117,31 @@ export class WorkspaceWorkingTreeCard implements Component {
 		resetGitStatusCache();
 		resetBranchDiffCache();
 		resetGitFileChangesCache();
+	}
+
+	/**
+	 * Version signal for the rail builder: moves whenever the data, view state or size `render` depends on moves,
+	 * so an unchanged key means the previous lines (and hitboxes) are still right. Runs every frame, so it keeps
+	 * the stale-while-revalidate reads ticking exactly like `render` does.
+	 */
+	getRenderKey(width: number, availableHeight?: number): string | undefined {
+		const cwd = this.ctx?.cwd ?? process.cwd();
+		const selectedBranch = getGitTabSelectedBranch();
+		const parts: Array<string | number | boolean | null | undefined> = [
+			idOf(loadSolviColors()),
+			idOf(solviGlyphs(this.theme)),
+			width,
+			availableHeight,
+			this.expanded,
+			this.scrollOffset,
+			selectedBranch,
+		];
+		if (selectedBranch) {
+			parts.push(JSON.stringify(fetchBranchDiff(cwd, selectedBranch, 3000)));
+		} else {
+			parts.push(JSON.stringify(fetchGitFileChanges(cwd)), JSON.stringify(fetchGitStatus(cwd, 3000)));
+		}
+		return parts.join(String.fromCharCode(1));
 	}
 
 	render(width: number, availableHeight?: number): string[] {

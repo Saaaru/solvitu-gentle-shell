@@ -1,6 +1,7 @@
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { safeFg, unifySidebarCardFrame } from "./solvi-theme.ts";
+import { themeStamp } from "./theme/theme-adapter.ts";
 import { loadSolviLayout } from "./solvi-layout.ts";
 import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
 import { WorkspaceGitGraphCard, WorkspaceWorkingTreeCard, getGitSyncBadge } from "./solvi-git-graph.ts";
@@ -38,6 +39,122 @@ export interface RailBuilderContext {
 }
 
 /**
+ * Optional version signal a rail card can expose. `getRenderKey(width, height)` returns a cheap string that
+ * changes whenever anything the card's `render` output depends on changes (it may still trigger background
+ * refreshes, such as stale-while-revalidate reads, since it runs every frame). While the key, width, height and
+ * theme are unchanged the builder reuses the card's previous lines and does not call `render` again. Cards that
+ * do not expose it (animated cards, for one) render every frame; their output is then compared line by line to
+ * the previous frame so the post-processing is still skipped when nothing changed.
+ */
+export interface RailCardVersioned {
+	getRenderKey?(width: number, availableHeight?: number): string | undefined;
+}
+
+interface CardMemo {
+	key: string | undefined;
+	width: number;
+	height: number | undefined;
+	theme: unknown;
+	stamp: string;
+	unify: boolean;
+	raw: string[];
+	lines: string[];
+}
+
+const cardMemos = new WeakMap<object, CardMemo>();
+
+interface RailMemo {
+	signature: string;
+	sections: Array<{ key: string; component: unknown; lines: string[] }>;
+	result: RailBuildResult;
+}
+
+const railMemos = new WeakMap<object, RailMemo>();
+
+function sameLines(a: readonly string[], b: readonly string[]): boolean {
+	if (a === b) return true;
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+	return true;
+}
+
+function trimTrailingBlank(lines: string[]): string[] {
+	const raw = [...lines];
+	while (raw.length && raw[raw.length - 1]?.trim() === "") raw.pop();
+	return raw;
+}
+
+/**
+ * Renders (or reuses) one card. `preRaw` carries lines the caller already rendered in this frame.
+ */
+function resolveCard(
+	component: any,
+	width: number,
+	height: number | undefined,
+	theme: unknown,
+	stamp: string,
+	unify: boolean,
+	preRaw?: string[],
+): CardMemo {
+	const memo = component && typeof component === "object" ? cardMemos.get(component) : undefined;
+	const sameContext =
+		!!memo && memo.width === width && memo.height === height && memo.theme === theme && memo.stamp === stamp;
+
+	let key: string | undefined;
+	if (!preRaw && typeof component?.getRenderKey === "function") {
+		try {
+			key = component.getRenderKey(width, height);
+		} catch {
+			key = undefined;
+		}
+	}
+
+	let raw: string[] | undefined = preRaw;
+	if (sameContext && key !== undefined && memo!.key === key) {
+		if (memo!.unify === unify) return memo!;
+		raw = memo!.raw;
+	}
+	if (!raw) raw = trimTrailingBlank(component?.render(width, height as any) ?? []);
+
+	if (sameContext && memo!.unify === unify && sameLines(memo!.raw, raw)) {
+		if (!preRaw) memo!.key = key;
+		return memo!;
+	}
+
+	const lines = unify ? raw.map((line) => unifySidebarCardFrame(line, theme as any)) : raw;
+	const next: CardMemo = { key, width, height, theme, stamp, unify, raw, lines };
+	if (component && typeof component === "object") cardMemos.set(component, next);
+	return next;
+}
+
+const NO_UNIFY_KEYS = new Set([
+	"footer",
+	"context",
+	"todo",
+	"engram",
+	"engramHandoff",
+	"engram-handoff",
+	"gitGraph",
+	"workingTree",
+	"working-tree",
+	"tools",
+	"solvi-profiles",
+	"solvi-profiles-extended",
+	"profiles",
+	"memoryGraph",
+	"memory-graph",
+	"persistentMemory",
+	"persistent-memory",
+	"projectTree",
+	"project-tree",
+	"fileViewer",
+	"solviTab",
+	"solvi-tab",
+	"yt",
+	"models",
+]);
+
+/**
  * Builds the complete formatted lines of the SOLVI sidebar rail:
  * - Calculates heights dynamically down to prompt line (split 50/50 for 2 cards, full height for single/todo)
  * - Lazily instantiates any unmounted cards
@@ -67,10 +184,12 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 	}
 
 	const branding = renderSolviSidebarBanner(netWidth, theme);
+	const stamp = themeStamp(theme);
 	const bannerLinesCount = (branding && branding.length) ? branding.length + 1 : 0;
 	const tabsLinesCount = tabsEnabled ? 2 : 0;
 	const headerLines = 1 + bannerLinesCount + tabsLinesCount + 1;
 
+	const priorPass = new Map<string, { component: unknown; raw: string[] }>();
 	let availableCardHeight: number | undefined;
 	let cardHeights: (number | undefined)[] = [];
 	const termRows = tui.terminal?.rows ?? loadSolviLayout().sidebar.fallbackRows ?? 45;
@@ -100,8 +219,9 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 		for (const key of targetCardKeys) {
 			if (key === "todo") break;
 			const comp = state.parts.get(key);
-			const raw = [...(comp?.render(netWidth) ?? [])];
-			while (raw.length && raw[raw.length - 1]?.trim() === "") raw.pop();
+			// The section pass below reuses these lines instead of rendering the same card a second time.
+			const raw = comp ? resolveCard(comp, netWidth, undefined, theme, stamp, false).raw : [];
+			priorPass.set(key, { component: comp, raw });
 			if (raw.length > 0) {
 				priorLines += raw.length + 1;
 			}
@@ -196,38 +316,54 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 			const renderHeight = (targetCardKeys.length === 1 || targetCardKeys.length === 2 || key === "projectTree" || key === "project-tree" || key === "todo")
 				? (cardHeights[index] ?? availableCardHeight)
 				: undefined;
-			const rawLines = [...(component?.render(netWidth, renderHeight as any) ?? [])];
-			while (rawLines.length && rawLines[rawLines.length - 1]?.trim() === "") rawLines.pop();
-			const lines =
-				key !== "footer" &&
-				key !== "context" &&
-				key !== "todo" &&
-				key !== "engram" &&
-				key !== "engramHandoff" &&
-				key !== "engram-handoff" &&
-				key !== "gitGraph" &&
-				key !== "workingTree" &&
-				key !== "working-tree" &&
-				key !== "tools" &&
-				key !== "solvi-profiles" &&
-				key !== "solvi-profiles-extended" &&
-				key !== "profiles" &&
-				key !== "memoryGraph" &&
-				key !== "memory-graph" &&
-				key !== "persistentMemory" &&
-				key !== "persistent-memory" &&
-				key !== "projectTree" &&
-				key !== "project-tree" &&
-				key !== "fileViewer" &&
-				key !== "solviTab" &&
-				key !== "solvi-tab" &&
-				key !== "yt" &&
-				key !== "models"
-					? rawLines.map((line) => unifySidebarCardFrame(line, theme))
-					: rawLines;
+			const prior = priorPass.get(key);
+			const preRaw = prior && prior.component === component && renderHeight === undefined ? prior.raw : undefined;
+			const lines = component
+				? resolveCard(component, netWidth, renderHeight as number | undefined, theme, stamp, !NO_UNIFY_KEYS.has(key), preRaw).lines
+				: [];
 			return { key, component, lines };
 		})
 		.filter((s) => s.lines.length > 0);
+
+	const gitSyncBadgeForSig = tabsEnabled ? getGitSyncBadge((tui as any)?.cwd ?? process.cwd()) : "";
+	const signature = [
+		contentWidth,
+		layout.railPadding,
+		tabsEnabled ? 1 : 0,
+		activeTab.id,
+		stamp,
+		gitSyncBadgeForSig,
+		branding.join("\n"),
+	].join("\u0001");
+	const memoOwner = state as object;
+	const previous = railMemos.get(memoOwner);
+	if (
+		previous &&
+		previous.signature === signature &&
+		previous.sections.length === sectionData.length &&
+		previous.sections.every(
+			(sec, i) =>
+				sec.key === sectionData[i].key &&
+				sec.component === sectionData[i].component &&
+				sameLines(sec.lines, sectionData[i].lines),
+		) &&
+		(previous.result as RailBuildResult & { theme?: unknown }).theme === theme
+	) {
+		return previous.result;
+	}
+	const remember = (result: RailBuildResult): RailBuildResult => {
+		if (result.success) {
+			(result as RailBuildResult & { theme?: unknown }).theme = theme;
+			railMemos.set(memoOwner, {
+				signature,
+				sections: sectionData.map((sec) => ({ key: sec.key, component: sec.component, lines: sec.lines })),
+				result,
+			});
+		} else {
+			railMemos.delete(memoOwner);
+		}
+		return result;
+	};
 
 	let railLines: string[] = [""];
 	const sectionMappings: SectionMapping[] = [];
@@ -261,7 +397,7 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 		if (!railLines.length || !sectionData.length || railLines.some((line) => visibleWidth(line) > contentWidth)) {
 			return { success: false, railLines: [], sectionMappings: [], tabHitboxes: [], tabBarLineIndex: -1, tabBarDividerLineIndex: -1 };
 		}
-		return { success: true, railLines, sectionMappings, tabHitboxes: [], tabBarLineIndex: -1, tabBarDividerLineIndex: -1 };
+		return remember({ success: true, railLines, sectionMappings, tabHitboxes: [], tabBarLineIndex: -1, tabBarDividerLineIndex: -1 });
 	}
 
 	// Tabs enabled flow
@@ -309,12 +445,12 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 		return { success: false, railLines: [], sectionMappings: [], tabHitboxes: [], tabBarLineIndex: -1, tabBarDividerLineIndex: -1 };
 	}
 
-	return {
+	return remember({
 		success: true,
 		railLines,
 		sectionMappings,
 		tabHitboxes,
 		tabBarLineIndex,
 		tabBarDividerLineIndex,
-	};
+	});
 }
