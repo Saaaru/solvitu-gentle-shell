@@ -170,33 +170,32 @@ test("sidebar toggle - persistence round trip and corrupt file tolerance", () =>
 	}
 });
 
-test("sidebar toggle - registers alt+/ and /sidebar, both toggle and request a render", async () => {
+test("sidebar toggle - /sidebar toggles, switches on and off, and requests a render", async () => {
 	resetAll();
 	resetSidebarVisibility();
 	setSidebarVisible(true, { persist: false });
-	const shortcuts = new Map<string, any>();
 	const commands = new Map<string, any>();
+	let shortcutsRegistered = 0;
 	registerSidebarToggle({
-		registerShortcut: (id: string, o: any) => shortcuts.set(id, o),
+		registerShortcut: () => shortcutsRegistered++,
 		registerCommand: (name: string, o: any) => commands.set(name, o),
 	} as any);
-	assert.ok(shortcuts.has("alt+/"));
-	assert.ok(!shortcuts.has("alt+b"), "alt+b is Pi's cursorWordLeft");
+	assert.equal(shortcutsRegistered, 0, "no shortcut: every free Alt key collided with pi-btw");
 	let renders = 0;
 	footerRegistry.latestTodoTui = { terminal: { columns: 160, rows: 40 }, requestRender: () => renders++ } as any;
 	const notes: string[] = [];
 	const ctx: any = { ui: { notify: (m: string) => notes.push(m) } };
 	try {
-		shortcuts.get("alt+/").handler();
+		await commands.get("sidebar").handler("off", ctx);
 		assert.equal(isSidebarVisible(), false);
 		assert.equal(renders, 1);
 		await commands.get("sidebar").handler("on", ctx);
 		assert.equal(isSidebarVisible(), true);
-		await commands.get("sidebar").handler("off", ctx);
-		assert.equal(isSidebarVisible(), false);
 		await commands.get("sidebar").handler("", ctx);
+		assert.equal(isSidebarVisible(), false);
+		await commands.get("sidebar").handler("toggle", ctx);
 		assert.equal(isSidebarVisible(), true);
-		assert.equal(notes.length, 3);
+		assert.equal(notes.length, 4);
 	} finally {
 		footerRegistry.latestTodoTui = undefined as any;
 		fs.rmSync(sidebarStatePath(), { force: true });

@@ -1,9 +1,9 @@
 # sidebar-toggle
 
-Objective: toggleable sidebar so the terminal can run fullscreen without it. Alt+/ and `/sidebar [toggle|on|off]`.
+Objective: toggleable sidebar so the terminal can run fullscreen without it. `/sidebar [toggle|on|off]`.
 
 Decisions
-- Alt+B collides with Pi `tui.editor.cursorWordLeft` (also bound in the user's keybindings.json). Alt+W was first chosen but collides with pi-btw; Alt+/ is unused by Pi docs and every installed extension (checked by grepping all alt+ strings).
+- Alt+B collides with Pi `tui.editor.cursorWordLeft` (also bound in the user's keybindings.json). Alt+W was first chosen but collides with pi-btw; Alt+/ also collides with pi-btw (its shortcuts are not discoverable by grep), so the shortcut was dropped and only /sidebar remains.
 - State lives in `<agent-dir>/solvi/sidebar-state.json` (`{"visible":bool}`), not in the layered Workspace.layout.json, which is read-only config. Default visible; read/write never throw.
 - Hidden: `prepare()` returns early (no rail build, no card renders), left border dropped, the foreign rail is still discarded; chat component is the only hstack entry.
 - Width caches (filledColumn, child card cache, rail memo) are keyed by width/signature; toggling also clears the rail memo and rail lines.

@@ -5,13 +5,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { footerRegistry } from "./footer/footer-registry.ts";
 
 /**
- * Sidebar on/off switch (Alt+/, /sidebar). Module-level state so the layout node in sidebar.ts can read it on
+ * Sidebar on/off switch (/sidebar). Module-level state so the layout node in sidebar.ts can read it on
  * every frame. The choice is persisted in a small JSON file next to the other solvi user files
  * (`<agent-dir>/solvi/sidebar-state.json`); the layered Workspace.layout.json stays read-only config.
  * Every read and write is best effort and never throws. Default: visible.
  */
 export const SIDEBAR_STATE_FILENAME = "sidebar-state.json";
-export const SIDEBAR_TOGGLE_SHORTCUT = "alt+/";
 
 export function sidebarStatePath(): string {
 	const agentDir = process.env.PI_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
@@ -81,8 +80,8 @@ const SUBCOMMANDS = [
 	{ value: "off", description: "Hide the sidebar (full-width chat)" },
 ];
 
-/** Registers the Alt+/ shortcut and the /sidebar [toggle|on|off] command. */
-export function registerSidebarToggle(pi: Pick<ExtensionAPI, "registerShortcut" | "registerCommand">): void {
+/** Registers the /sidebar [toggle|on|off] command. No keyboard shortcut: every free Alt key collided with pi-btw. */
+export function registerSidebarToggle(pi: Pick<ExtensionAPI, "registerCommand">): void {
 	const apply = (next: () => boolean): boolean => {
 		const visible = next();
 		try {
@@ -90,10 +89,6 @@ export function registerSidebarToggle(pi: Pick<ExtensionAPI, "registerShortcut" 
 		} catch {}
 		return visible;
 	};
-	pi.registerShortcut(SIDEBAR_TOGGLE_SHORTCUT as any, {
-		description: "Show or hide the sidebar",
-		handler: () => void apply(toggleSidebar),
-	});
 	pi.registerCommand("sidebar", {
 		description: "Sidebar: toggle | on | off",
 		getArgumentCompletions: (prefix: string) => {
@@ -109,7 +104,7 @@ export function registerSidebarToggle(pi: Pick<ExtensionAPI, "registerShortcut" 
 			const visible =
 				sub === "on" ? apply(() => setSidebarVisible(true)) : sub === "off" ? apply(() => setSidebarVisible(false)) : apply(toggleSidebar);
 			try {
-				ctx?.ui?.notify?.(`Sidebar ${visible ? "shown" : "hidden"} (${SIDEBAR_TOGGLE_SHORTCUT})`, "info");
+				ctx?.ui?.notify?.(`Sidebar ${visible ? "shown" : "hidden"}`, "info");
 			} catch {}
 		},
 	} as any);
