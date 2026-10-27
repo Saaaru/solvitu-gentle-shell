@@ -170,7 +170,7 @@ test("sidebar toggle - persistence round trip and corrupt file tolerance", () =>
 	}
 });
 
-test("sidebar toggle - registers alt+w and /sidebar, both toggle and request a render", async () => {
+test("sidebar toggle - registers alt+/ and /sidebar, both toggle and request a render", async () => {
 	resetAll();
 	resetSidebarVisibility();
 	setSidebarVisible(true, { persist: false });
@@ -180,14 +180,14 @@ test("sidebar toggle - registers alt+w and /sidebar, both toggle and request a r
 		registerShortcut: (id: string, o: any) => shortcuts.set(id, o),
 		registerCommand: (name: string, o: any) => commands.set(name, o),
 	} as any);
-	assert.ok(shortcuts.has("alt+w"));
+	assert.ok(shortcuts.has("alt+/"));
 	assert.ok(!shortcuts.has("alt+b"), "alt+b is Pi's cursorWordLeft");
 	let renders = 0;
 	footerRegistry.latestTodoTui = { terminal: { columns: 160, rows: 40 }, requestRender: () => renders++ } as any;
 	const notes: string[] = [];
 	const ctx: any = { ui: { notify: (m: string) => notes.push(m) } };
 	try {
-		shortcuts.get("alt+w").handler();
+		shortcuts.get("alt+/").handler();
 		assert.equal(isSidebarVisible(), false);
 		assert.equal(renders, 1);
 		await commands.get("sidebar").handler("on", ctx);

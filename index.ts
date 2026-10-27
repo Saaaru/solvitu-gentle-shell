@@ -90,7 +90,7 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	registerTreeKeys(pi);
 	registerSpotifyCommands(pi);
 	registerSidebarArrowKeys(pi);
-	// Alt+W and /sidebar show or hide the whole sidebar (Alt+B is Pi's cursorWordLeft, so it is not usable)
+	// Alt+/ and /sidebar show or hide the whole sidebar (Alt+B is Pi's cursorWordLeft, so it is not usable)
 	registerSidebarToggle(pi);
 
 	// Shows the bee until the first message, then hands the header slot to installWorkspaceHeader.

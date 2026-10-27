@@ -5,13 +5,13 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { footerRegistry } from "./footer/footer-registry.ts";
 
 /**
- * Sidebar on/off switch (Alt+W, /sidebar). Module-level state so the layout node in sidebar.ts can read it on
+ * Sidebar on/off switch (Alt+/, /sidebar). Module-level state so the layout node in sidebar.ts can read it on
  * every frame. The choice is persisted in a small JSON file next to the other solvi user files
  * (`<agent-dir>/solvi/sidebar-state.json`); the layered Workspace.layout.json stays read-only config.
  * Every read and write is best effort and never throws. Default: visible.
  */
 export const SIDEBAR_STATE_FILENAME = "sidebar-state.json";
-export const SIDEBAR_TOGGLE_SHORTCUT = "alt+w";
+export const SIDEBAR_TOGGLE_SHORTCUT = "alt+/";
 
 export function sidebarStatePath(): string {
 	const agentDir = process.env.PI_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
@@ -81,7 +81,7 @@ const SUBCOMMANDS = [
 	{ value: "off", description: "Hide the sidebar (full-width chat)" },
 ];
 
-/** Registers the Alt+W shortcut and the /sidebar [toggle|on|off] command. */
+/** Registers the Alt+/ shortcut and the /sidebar [toggle|on|off] command. */
 export function registerSidebarToggle(pi: Pick<ExtensionAPI, "registerShortcut" | "registerCommand">): void {
 	const apply = (next: () => boolean): boolean => {
 		const visible = next();
