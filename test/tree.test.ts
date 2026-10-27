@@ -12,6 +12,7 @@ import {
 } from "../src/solvi-tree.ts";
 import { resolveSidebarTab, SIDEBAR_TAB_CARD_MAP } from "../src/sidebar.ts";
 import { resetAll } from "./test-helpers.ts";
+import { awaitGitIdle } from "../src/git/git-swr.ts";
 
 test("solvi-tree - scanDirectoryTree returns sorted directories and files, ignoring default patterns", () => {
 	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-scan-test-"));
@@ -458,7 +459,7 @@ test("solvi-tree - resolveSidebarTab resolves '1', 'tree', 'TREE' to projectTree
 });
 
 
-test("solvi-tree - renders Git status badges and dirty directory bullets", () => {
+test("solvi-tree - renders Git status badges and dirty directory bullets", async () => {
 	resetAll();
 	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-tree-git-"));
 	try {
@@ -476,12 +477,15 @@ test("solvi-tree - renders Git status badges and dirty directory bullets", () =>
 
 		const card = new WorkspaceProjectTreeCard(undefined, undefined, undefined, tempDir);
 		card.getExpandedDirs().add("src");
+		card.render(60);
+		await awaitGitIdle();
 		const lines = card.render(60);
 		const joined = lines.join("\n");
 
 		assert.ok(joined.includes("M"), "Modified file in tree should have M badge");
 		assert.ok(joined.includes("●"), "Directory containing modified file should have dirty bullet ●");
 	} finally {
+		await awaitGitIdle();
 		fs.rmSync(tempDir, { recursive: true, force: true });
 	}
 });

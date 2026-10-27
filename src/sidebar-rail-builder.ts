@@ -4,6 +4,7 @@ import { safeFg, unifySidebarCardFrame } from "./solvi-theme.ts";
 import { loadSolviLayout } from "./solvi-layout.ts";
 import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
 import { WorkspaceGitGraphCard, WorkspaceWorkingTreeCard, getGitSyncBadge } from "./solvi-git-graph.ts";
+import { bindGitRenderHost } from "./git/git-swr.ts";
 import { WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
 import { WorkspaceProjectTreeCard, WorkspaceFileViewerCard, getFolderState } from "./solvi-tree.ts";
 import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
@@ -44,6 +45,7 @@ export interface RailBuilderContext {
  */
 export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult {
 	const { state, tui, theme, activeDock, activeTranscript, contentWidth } = ctx;
+	bindGitRenderHost(tui);
 	const layout = loadSolviLayout().sidebar;
 	const netWidth = contentWidth - layout.railPadding * 2;
 	const tabsEnabled = layout.tabsEnabled !== false;
