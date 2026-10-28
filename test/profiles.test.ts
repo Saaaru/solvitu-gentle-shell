@@ -304,47 +304,26 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard renders switcher, accounts,
 		const linesWithButtons = lines.filter((l) => l.includes("[●") || l.includes("[○"));
 		assert.ok(linesWithButtons.length >= 2, "Should wrap profile buttons across multiple lines dynamically");
 
-		// 2. Real quota bars for ranchesca and nekocin01 (5h + Semanal), graceful fallback for cinlo_dig
-		assert.ok(fullText.includes("ranchesca"), "Should list ranchesca account");
-		assert.ok(fullText.includes("85%"), "Should show 85% 5h quota for ranchesca");
-		assert.ok(fullText.includes("90%"), "Should show 90% weekly quota for ranchesca");
-		assert.ok(fullText.includes("nekocin01"), "Should list nekocin01 account");
-		assert.ok(fullText.includes("30%"), "Should show 30% 5h quota for nekocin01");
-		assert.ok(fullText.includes("45%"), "Should show 45% weekly quota for nekocin01");
-		assert.ok(fullText.includes("cinlo_dig"), "Should list cinlo_dig account");
-		assert.ok(fullText.includes("5h"), "Should show 5h quota label");
-		assert.ok(fullText.includes("Semanal"), "Should show Semanal quota label");
+		// 2. Compact format: no accounts, quota, gauges, or effort
+		const plainText = fullText.replace(/\x1b\[[0-9;]*m/g, "");
+		for (const banned of ["@", "sin cuota", "▰", "▱", "(high)", "(medium)", "(low)", "%", "Semanal"]) {
+			assert.ok(!plainText.includes(banned), `Compact card must not render ${banned}`);
+		}
 
-		// 3. Flat subagent list structure & 3 lines per agent with full-width bars
+		// 3. One line per role with short model name on the right
 		assert.ok(/host \/ orquestador/i.test(fullText), "Should render Host orchestrator");
-		assert.ok(fullText.includes("gentle-ai-explore"), "Should render gentle-ai-explore");
-		assert.ok(fullText.includes("gentle-ai-worker"), "Should render gentle-ai-worker");
 		assert.ok(!fullText.includes("ODD Core"), "Should not contain old collapsible category ODD Core");
 		assert.ok(!fullText.includes("Judgment Day"), "Should not contain old collapsible category Judgment Day");
-		assert.ok(fullText.includes("sin cuota"), "Should show sin cuota fallback for cinlo_dig");
-		assert.ok(fullText.includes("▰"), "Should render gauge filled glyph");
-		assert.ok(fullText.includes("▱"), "Should render gauge empty glyph");
-
-		// 4. Full-width bar check: lines spanning full innerWidth
-		const innerWidth = 52 - 4; // 48
-		const fullGaugeLines = lines.filter((l) => {
-			const cleaned = l.replace(/\x1b\[[0-9;]*m/g, "");
-			return (cleaned.includes("▰") || cleaned.includes("▱")) && !cleaned.includes("@") && !cleaned.includes("%");
-		});
-		assert.ok(fullGaugeLines.length >= 3, "Should have dedicated full-width gauge lines below accounts");
-		// Check that fallback gauge for unavailable quota is entirely empty glyphs
-		const fallbackGauge = fullGaugeLines.find((l) => {
-			const cleaned = l.replace(/\x1b\[[0-9;]*m/g, "");
-			return cleaned.includes("▱".repeat(innerWidth));
-		});
-		assert.ok(fallbackGauge, "Should have a gauge line with full empty glyphs for account without quota");
-
-		// Check breathing room spacer lines between agents
-		const emptySpacerLines = lines.filter((l) => {
-			const cleaned = l.replace(/\x1b\[[0-9;]*m/g, "");
-			return cleaned.startsWith("│") && cleaned.endsWith("│") && cleaned.slice(1, -1).trim() === "";
-		});
-		assert.ok(emptySpacerLines.length >= 2, "Should have empty spacer lines between agents for breathing room");
+		const plainLines = lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ""));
+		for (const needle of ["host / orquestador", "gentle-ai-explore", "gentle-ai-worker"]) {
+			const matching = plainLines.filter((l) => l.includes(needle));
+			assert.equal(matching.length, 1, `${needle} must render on exactly one line`);
+			assert.ok(/gemini/i.test(matching[0]), `${needle} line must carry the short model name`);
+		}
+		const emptySpacerLines = plainLines.filter(
+			(l) => l.startsWith("│") && l.endsWith("│") && l.slice(1, -1).trim() === "",
+		);
+		assert.equal(emptySpacerLines.length, 0, "Should not render blank spacer lines between agents");
 
 		// 5. Task Manager status summary
 		assert.ok(fullText.includes("Task Manager"), "Should render Task Manager status");
@@ -366,13 +345,8 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard renders switcher, accounts,
 		const activeAfter = fs.readFileSync(path.join(projDir, ".active"), "utf8").trim();
 		assert.equal(activeAfter, "cinlo2", "Active profile should be switched to cinlo2");
 
-		// 7. Test clicking effort toggles agent effort (e.g. gentle-ai-worker low -> medium -> high)
-		const effortHitbox = hitboxes.find((h) => h.type === "effort-agent" && h.agentId === "gentle-ai-worker");
-		assert.ok(effortHitbox, "Effort hitbox for gentle-ai-worker must exist");
-		renderRequested = false;
-		const effortClickHandled = card.handleRailClick(effortHitbox.lineIndex, "left", effortHitbox.startX + 1);
-		assert.ok(effortClickHandled, "Click on effort hitbox should be handled");
-		assert.ok(renderRequested, "requestRender should be called on effort toggle");
+		// 7. Effort is no longer rendered, so no effort hitboxes exist
+		assert.ok(!hitboxes.some((h) => h.type === "effort-agent" || h.type === "effort-host"), "No effort hitboxes");
 
 		// 8. Test wheel on profiles card is disabled to preserve natural sidebar vertical scrolling
 		renderRequested = false;
@@ -432,9 +406,9 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard internal scrolling and heig
 
 		const card = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir);
 
-		// 1. Calling render(52, 25) constrains lines to exactly 25
-		const lines = card.render(52, 25);
-		assert.equal(lines.length, 25, "Lines must be constrained to exactly 25");
+		// 1. Calling render(52, 9) constrains lines to exactly 9 (8 compact body lines overflow 5 available)
+		const lines = card.render(52, 9);
+		assert.equal(lines.length, 9, "Lines must be constrained to exactly 9");
 
 		// Top header and divider should be intact
 		assert.ok(lines[0].includes("Profiles & Clusters"), "Header must be at the top");
@@ -448,8 +422,8 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard internal scrolling and heig
 		assert.equal(wheelDownHandled, true, "Wheel down should be handled internally");
 		assert.equal(renderRequested, true, "requestRender should be called on scroll");
 
-		const scrolledLines = card.render(52, 25);
-		assert.equal(scrolledLines.length, 25, "Scrolled lines must still equal 25");
+		const scrolledLines = card.render(52, 9);
+		assert.equal(scrolledLines.length, 9, "Scrolled lines must still equal 25");
 		const scrolledText = scrolledLines.join("\n");
 		assert.ok(scrolledText.includes("arriba"), "Should indicate scrolled lines above");
 
@@ -509,7 +483,7 @@ test("solvi-profiles - edge cases for account extraction and empty profiles", ()
 	assert.equal(loadProfileDetails("does-not-exist-xyz", "/tmp"), null);
 });
 
-test("solvi-profiles - dynamic multi-provider matching and single pool rendering (Gemini/Argon & Codex)", () => {
+test("solvi-profiles - compact host and subagent rows ignore provider quota pools", () => {
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-profiles-provider-"));
 	const profilesDir = path.join(tmpDir, ".pi", "profiles");
 	fs.mkdirSync(profilesDir, { recursive: true });
@@ -564,17 +538,17 @@ test("solvi-profiles - dynamic multi-provider matching and single pool rendering
 		const lines = card.render(50);
 		const fullText = lines.join("\n");
 
-		// 1. Host using GPT must resolve to codex 'cilon-gpt' (67% 5h, 81% Semanal), NOT antigravity 'cilon' (10%)
-		assert.ok(fullText.includes("cilon-gpt"), "Host with GPT model must match codex cilon-gpt");
-		assert.ok(fullText.includes("67%"), "Host must display 67% from codex account");
-		assert.ok(fullText.includes("81%"), "Host must display 81% from codex account");
-		assert.ok(!fullText.includes("10%"), "Host must NOT accidentally match antigravity cilon account");
-
-		// 2. Worker using Gemini/Argon in testacct has only 1 weekly pool (100%)
-		assert.ok(fullText.includes("testacct"), "Worker must list testacct account");
-		assert.ok(fullText.includes("100%"), "Worker with Argon must show 100% weekly quota");
-		// Verify dynamic label Semanal is rendered cleanly alongside the @testacct prefix
-		assert.ok(fullText.includes("@testacct · Semanal"), "Single-pool account must render @testacct · Semanal on first line");
+		// Compact: host + worker on one line each, short model names, no quota/account data
+		const plain = fullText.replace(/\x1b\[[0-9;]*m/g, "");
+		for (const banned of ["@", "cilon", "testacct", "%", "Semanal", "sin cuota"]) {
+			assert.ok(!plain.includes(banned), `Compact card must not render ${banned}`);
+		}
+		const plainRows = plain.split(/\n/);
+		const hostLine = plainRows.filter((l) => l.includes("host / orquestador"));
+		assert.equal(hostLine.length, 1);
+		const workerLine = plainRows.filter((l) => l.includes("gentle-ai-worker"));
+		assert.equal(workerLine.length, 1);
+		for (const l of lines) assert.equal(visibleWidth(l), 50);
 	} finally {
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 		resetAll();
