@@ -1,4 +1,4 @@
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { solviGlyphs, solviPalette, safeFg } from "../solvi-theme.ts";
 import { loadSolviColors } from "../solvi-colors.ts";
@@ -33,10 +33,14 @@ export class WorkspaceModelsCard implements Component {
 	private patterns: string[] | undefined;
 	private patternsAt = 0;
 
-	constructor(ctx: ExtensionContext, tui: TUI, theme?: Theme) {
+	private readonly pi?: ExtensionAPI;
+	private selectedIndex: number | undefined = undefined;
+
+	constructor(ctx: ExtensionContext, tui: TUI, theme?: Theme, pi?: ExtensionAPI) {
 		this.ctx = ctx;
 		this.tui = tui;
 		this.theme = theme;
+		this.pi = pi ?? (tui as any)?.__solviPi;
 	}
 
 	invalidate(): void {
@@ -44,8 +48,68 @@ export class WorkspaceModelsCard implements Component {
 		this.tui.requestRender();
 	}
 
-	handleClick(_localIndex?: number, _button?: string): boolean {
-		return false;
+	private rows() {
+		return buildModelRows(this.ctx, {
+			enabledPatterns: this.enabledPatterns(),
+			quotaForActive: () => activeQuotaPercent(this.ctx),
+		}).rows;
+	}
+
+	getSelectedIndex(): number | undefined {
+		return this.selectedIndex;
+	}
+
+	moveCursor(delta: number): boolean {
+		const rows = this.rows();
+		if (rows.length === 0) return false;
+		let base = this.selectedIndex;
+		if (base === undefined) base = Math.max(0, rows.findIndex((r) => r.active));
+		this.selectedIndex = (((base + delta) % rows.length) + rows.length) % rows.length;
+		this.tui.requestRender();
+		return true;
+	}
+
+	async activateSelected(): Promise<boolean> {
+		const rows = this.rows();
+		const index = this.selectedIndex ?? rows.findIndex((r) => r.active);
+		return this.activateModelAt(index);
+	}
+
+	async activateModelAt(rowIndex: number): Promise<boolean> {
+		const row = this.rows()[rowIndex];
+		if (!row || typeof this.pi?.setModel !== "function") return false;
+		const ctx: any = this.ctx;
+		const same = (m: any) => m?.provider === row.provider && m?.id === row.id;
+		let target: any;
+		const scoped = Array.isArray(ctx?.scopedModels) ? ctx.scopedModels : [];
+		for (const s of scoped) {
+			const m = s?.model ?? s;
+			if (same(m)) {
+				target = m;
+				break;
+			}
+		}
+		target ??= ctx?.modelRegistry?.find?.(row.provider, row.id);
+		target ??= (ctx?.modelRegistry?.getAvailable?.() ?? []).find(same);
+		target ??= { provider: row.provider, id: row.id, name: row.name };
+		await this.pi.setModel(target);
+		this.selectedIndex = rowIndex;
+		this.tui.requestRender();
+		return true;
+	}
+
+	/** Line 0 is the top border; lines 1..rows.length are the model rows. */
+	handleClick(localIndex?: number, _button?: string): boolean {
+		if (localIndex === undefined || localIndex < 1) return false;
+		const rowIndex = localIndex - 1;
+		if (rowIndex >= this.rows().length) return false;
+		this.selectedIndex = rowIndex;
+		void this.activateModelAt(rowIndex).catch(() => {});
+		return true;
+	}
+
+	handleRailClick(localIndex?: number, button?: string): boolean {
+		return this.handleClick(localIndex, button);
 	}
 
 	private enabledPatterns(): string[] | undefined {
@@ -91,10 +155,13 @@ export class WorkspaceModelsCard implements Component {
 			return lines;
 		}
 
-		for (const row of result.rows) {
+		const selected =
+			this.selectedIndex === undefined ? undefined : Math.min(this.selectedIndex, result.rows.length - 1);
+		result.rows.forEach((row, i) => {
 			const f = formatModelRow(row);
-			lines.push(boxLine(row.active ? c.mint(f.title) : c.text(f.title)));
-		}
+			const prefix = i === selected ? `${c.pinkBright("›")} ` : "";
+			lines.push(boxLine(prefix + (row.active ? c.mint(f.title) : c.text(f.title))));
+		});
 		if (result.hidden > 0) {
 			lines.push(boxLine(c.dim(`+${result.hidden} más`)));
 		}

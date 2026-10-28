@@ -23,6 +23,7 @@ export interface FooterRegistryState {
 	latestPersistentMemory?: WorkspacePersistentMemoryCard;
 	latestMemoryGraph?: WorkspacePersistentMemoryCard;
 	latestProjectTree?: WorkspaceProjectTreeCard;
+	latestModelsCard?: import("../models/models-card.ts").WorkspaceModelsCard;
 	latestProfilesCard?: WorkspaceProfilesExtendedCard;
 }
 

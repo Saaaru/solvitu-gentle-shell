@@ -94,7 +94,8 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 		const workingTree = new WorkspaceWorkingTreeCard(ctx, tui, theme);
 		const toolsCard = new WorkspaceToolsCard(ctx, tui, theme);
 		const ecosystemCard = new WorkspaceEcosystemCard(ctx, tui, theme);
-		const modelsCard = new WorkspaceModelsCard(ctx, tui, theme);
+		const modelsCard = new WorkspaceModelsCard(ctx, tui, theme, pi);
+		footerRegistry.latestModelsCard = modelsCard;
 		const todos = new WorkspaceTodoMirror(ctx, tui, theme);
 
 		footerRegistry.latestTodoTui = tui;
@@ -176,6 +177,7 @@ export function installWorkspaceFooter(ctx: ExtensionContext, pi: ExtensionAPI):
 			render: (width: number) => modelsCard.render(width),
 			invalidate: () => modelsCard.invalidate(),
 			handleRailClick: (lineIndex: number, button?: string) => modelsCard.handleClick(lineIndex, button),
+			handleRailWheel: (delta: number) => modelsCard.moveCursor(delta > 0 ? 1 : -1),
 		};
 		const profilesCard = new WorkspaceProfilesExtendedCard(tui, theme, undefined, ctx, pi);
 		footerRegistry.latestProfilesCard = profilesCard;

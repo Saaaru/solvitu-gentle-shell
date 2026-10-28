@@ -275,3 +275,50 @@ test("models - formatModelRow adds a usage bar for used models only", () => {
 	});
 	assert.equal(idle.bar, undefined);
 });
+
+function interactiveCard() {
+	const set: any[] = [];
+	const pi: any = { setModel: async (m: any) => { set.push(m); return true; } };
+	const ctx = mockCtx({ scoped: [MODELS[0], MODELS[2], MODELS[3]], active: MODELS[0] });
+	let renders = 0;
+	const card = new WorkspaceModelsCard(ctx, { requestRender() { renders++; } } as any, undefined, pi);
+	return { card, set, renders: () => renders };
+}
+
+test("models - moveCursor starts at the active model, wraps and requests a render", () => {
+	const { card, renders } = interactiveCard();
+	assert.equal(card.getSelectedIndex(), undefined);
+	assert.ok(!card.render(50).join("\n").includes("›"));
+	assert.equal(card.moveCursor(1), true);
+	assert.equal(card.getSelectedIndex(), 1);
+	card.moveCursor(1);
+	card.moveCursor(1);
+	assert.equal(card.getSelectedIndex(), 0, "wraps forward");
+	card.moveCursor(-1);
+	assert.equal(card.getSelectedIndex(), 2, "wraps backward");
+	assert.equal(renders(), 4);
+	const lines = card.render(50);
+	assert.equal(lines.length, 5);
+	assert.ok(lines[3].includes("›"), lines[3]);
+	assert.equal(lines.filter((l) => l.includes("›")).length, 1);
+	for (const line of lines) assert.equal(calcVisibleWidth(line), 50);
+});
+
+test("models - activateSelected switches via pi.setModel with the real model object", async () => {
+	const { card, set } = interactiveCard();
+	card.moveCursor(1);
+	assert.equal(await card.activateSelected(), true);
+	assert.equal(set.length, 1);
+	assert.equal(set[0], MODELS[2]);
+	assert.equal(card.getSelectedIndex(), 1);
+});
+
+test("models - handleClick on a model row (line index + 1) switches the model", async () => {
+	const { card, set } = interactiveCard();
+	assert.equal(card.handleClick(3), true);
+	await new Promise((r) => setTimeout(r, 0));
+	assert.equal(set[0], MODELS[3]);
+	assert.equal(card.handleClick(0), false, "top border does nothing");
+	assert.equal(card.handleClick(9), false, "outside rows does nothing");
+	assert.equal(set.length, 1);
+});
