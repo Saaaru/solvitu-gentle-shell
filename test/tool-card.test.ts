@@ -178,25 +178,27 @@ class FakeToolExecution {
 }
 Object.defineProperty(FakeToolExecution, "name", { value: "ToolExecutionComponent" });
 
-test("transcript dispatcher - a Solvitu card passes through untouched: no frame, one render", () => {
+test("transcript dispatcher - every Solvitu card is framed in its category box, one render", () => {
 	const cardLines = ["", "[read]✎ read src/a.ts[/read]", "  line 1", "  ... (3 more lines, ctrl+o to expand)"];
 	for (const toolName of ["read", "write", "bash", "grep", "fetch_content", "mem_save", "ls", "mcp__x__y"]) {
 		const child = new FakeToolExecution(toolName, cardLines, solviToolRenderer(toolName));
 		assert.equal(isSolviCardComponent(child as any), true);
 		const out = formatTranscriptChildren([child as any], 80, theme);
-		assert.deepEqual(out.lines, cardLines, toolName);
+		assert.ok(stripAnsi(out.lines[0]).startsWith("┌─"), `${toolName} top border`);
+		assert.ok(stripAnsi(out.lines[out.lines.length - 1]).startsWith("└─"), `${toolName} bottom border`);
 		assert.equal(child.renders, 1, `${toolName} rendered exactly once`);
 		assert.equal(out.mouseChildren[0].component, child, "clicks reach Pi's own expand handler");
-		assert.equal(out.mouseChildren[0].height, cardLines.length);
-		assert.ok(!out.lines.some((l) => /[┌└│]/.test(l)), "no second frame");
+		assert.equal(out.mouseChildren[0].height, out.lines.length);
 	}
 });
 
-test("transcript dispatcher - consecutive bash and memory cards are not merged into one framed card", () => {
+test("transcript dispatcher - consecutive bash cards are framed as two separate boxes", () => {
 	const a = new FakeToolExecution("bash", ["", "a"], solviToolRenderer("bash"));
 	const b = new FakeToolExecution("bash", ["", "b"], solviToolRenderer("bash"));
 	const out = formatTranscriptChildren([a as any, b as any], 80, theme);
-	assert.deepEqual(out.lines, ["", "a", "", "b"]);
+	const plain = out.lines.map(stripAnsi);
+	assert.equal(plain.filter((l) => l.startsWith("┌─ >_ bash")).length, 2);
+	assert.equal(plain.filter((l) => l.startsWith("└─")).length, 2);
 });
 
 // ---- performance: a collapsed card must not pay for the size of the output ----

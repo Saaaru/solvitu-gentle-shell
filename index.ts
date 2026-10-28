@@ -86,6 +86,7 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 		ensureCliProxyApiRunning().catch(() => {});
 
 		if (!ctx.hasUI) return;
+		(ctx.ui as any)?.setHiddenThinkingLabel?.("thinking");
 
 		// Intercept ctx.ui.setWidget so the todo widget always renders in the sidebar rail slot.
 		if (ctx.ui && typeof ctx.ui.setWidget === "function" && !(ctx.ui as any).__solviSetWidgetWrapped) {

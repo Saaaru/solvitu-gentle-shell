@@ -35,7 +35,7 @@ import {
 	storeAssistantCard,
 } from "./transcript-assistant-cache.ts";
 import { PathLinkMouseProxy } from "./transcript-interactive.ts";
-import { isSolviCardComponent } from "../tool-card.ts";
+import { isSolviCardComponent, toolCategory } from "../tool-card.ts";
 import { memoizeChildCard, type CachedMouseEntry } from "./transcript-child-cache.ts";
 
 /**
@@ -113,8 +113,13 @@ export function formatTranscriptChild(
 		return frameCategoryBox(rawLines, `🐝 ${user}`, colors.userMessage, width, theme);
 	}
 
-	// Solvitu tool cards are already formatted by their own renderer: never frame or restyle them again.
-	if (isSolviCardComponent(child)) return child.render(width);
+	// Solvitu tool cards are formatted by their own renderer; frame them in their category box.
+	if (isSolviCardComponent(child)) {
+		const { title, tone } = solviCardFrame(child, colors);
+		const rawLines = child.render(Math.max(1, width - 4));
+		const boxed = frameCategoryBox(rawLines, title, tone, width, theme);
+		return boxed.length ? boxed : rawLines;
+	}
 
 	// Bash execution (single child fallback)
 	if (isBashComponent(child)) {
@@ -207,6 +212,28 @@ export function formatTranscriptChild(
 	return transformTranscriptLines(unwrapped, theme);
 }
 
+/** Title and tone of the category box that frames a Solvitu tool card. */
+function solviCardFrame(child: Component, colors: ReturnType<typeof loadSolviColors>): { title: string; tone: string } {
+	const anyChild = child as any;
+	const toolName = String(anyChild.toolName ?? "tool");
+	const failed = Boolean(anyChild.isError ?? anyChild.result?.isError);
+	const cat = toolCategory(toolName);
+	return { title: `${failed ? "✗" : cat.glyph} ${toolName}`, tone: failed ? colors.errorMessage : cat.tone };
+}
+
+/** Makes sure Pi renders thinking blocks as a short label, never the model's reasoning dump. */
+function hideAssistantThinking(child: Component): void {
+	const c = child as any;
+	if (c.hiddenThinkingLabel !== "thinking") {
+		if (typeof c.setHiddenThinkingLabel === "function") c.setHiddenThinkingLabel("thinking");
+		else c.hiddenThinkingLabel = "thinking";
+	}
+	if (c.hideThinkingBlock === false) {
+		if (typeof c.setHideThinkingBlock === "function") c.setHideThinkingBlock(true);
+		else c.hideThinkingBlock = true;
+	}
+}
+
 /** Drops leading and trailing blank lines so line indexes match the framed card body. */
 function trimBlankLines(lines: string[]): string[] {
 	const out = [...lines];
@@ -255,12 +282,19 @@ export function formatTranscriptChildren(
 			continue;
 		}
 
-		// 1b. Tool cards drawn by the Solvitu renderer (collapsed preview or expanded output) pass through as is.
+		// 1b. Tool cards drawn by the Solvitu renderer (collapsed preview or expanded output) get their own category box.
 		// Pi's own component keeps the clicks, so a click and ctrl+o both go through Pi's expanded flag.
 		if (isSolviCardComponent(child)) {
-			const cardLines = child.render(width);
-			mouseChildren.push({ component: child, height: cardLines.length });
-			lines.push(...cardLines);
+			ensureBreathingRoom();
+			const { title, tone } = solviCardFrame(child, colors);
+			const rawLines = child.render(Math.max(1, width - 4));
+			const card = memoizeChildCard("solvi-tool", [child], [rawLines], width, theme, [colors, title, tone], () => {
+				const boxed = frameCategoryBox(rawLines, title, tone, width, theme);
+				const finalLines = boxed.length ? boxed : rawLines;
+				return { lines: finalLines, mouse: [{ component: child, height: finalLines.length }] };
+			});
+			mouseChildren.push(...card.mouse);
+			lines.push(...card.lines);
 			i++;
 			continue;
 		}
@@ -478,7 +512,21 @@ export function formatTranscriptChildren(
 		const assistantTitle = `\u{1F916} ${strings.welcomePersona.name || "assistant"}`;
 		const assistantTone = colors.assistantMessage ?? "gentle";
 		let assistantKey: string | undefined;
+		let hasThinking = false;
 		if (name === "AssistantMessageComponent") {
+			const content = (child as any).lastMessage?.content;
+			if (Array.isArray(content)) {
+				hideAssistantThinking(child);
+				hasThinking = content.some((c: any) => c?.type === "thinking" && typeof c.thinking === "string" && c.thinking.trim().length > 0);
+				const hasText = content.some((c: any) => c?.type === "text" && typeof c.text === "string" && c.text.trim().length > 0);
+				if (hasThinking && !hasText) {
+					const boxed = frameCategoryBox([safeFg(theme, "dim", "thinking", "muted")], "thinking", "dim", width, theme);
+					mouseChildren.push({ component: child, height: boxed.length });
+					lines.push(...boxed);
+					i++;
+					continue;
+				}
+			}
 			// A finished message does not change between frames: reuse its card instead of rendering it again.
 			const fingerprint = assistantFingerprint(child);
 			if (fingerprint) {
@@ -492,7 +540,13 @@ export function formatTranscriptChildren(
 				}
 			}
 		}
-		const rawLines = child.render(width);
+		let rawLines = child.render(width);
+		if (hasThinking) {
+			rawLines = rawLines.filter((line) => {
+				const t = stripAnsi(line).trim().toLowerCase();
+				return t !== "thinking" && t !== "thinking...";
+			});
+		}
 		if (name !== "AssistantMessageComponent") {
 			const card = memoizeChildCard("generic", [child], [rawLines], width, theme, [colors], () => {
 				if (isAsciiArtOrBanner(rawLines)) {
@@ -503,13 +557,6 @@ export function formatTranscriptChildren(
 			});
 			mouseChildren.push(...card.mouse);
 			lines.push(...card.lines);
-			i++;
-			continue;
-		}
-
-		if (isAsciiArtOrBanner(rawLines)) {
-			mouseChildren.push({ component: child, height: rawLines.length });
-			lines.push(...rawLines);
 			i++;
 			continue;
 		}

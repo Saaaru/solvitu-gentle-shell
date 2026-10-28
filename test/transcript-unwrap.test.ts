@@ -278,3 +278,7 @@ test("unwrapNativeCard - memoization returns cached reference for identical arra
 	const second = unwrapNativeCard(raw);
 	assert.equal(first, second, "Repeated unwrapping of the same array must return identical memoized reference");
 });
+
+test("isAsciiArtOrBanner - prose mentioning the brand or the word banner is not a banner", () => {
+	assert.equal(isAsciiArtOrBanner(["Ese cambio ya está en solvitu-gentle-shell y gentle-shell banner"]), false);
+});

@@ -75,13 +75,17 @@ export function isAsciiArtOrBanner(lines: string[]): boolean {
 	const partner = strings.sidebarBanner?.partner?.trim();
 	const brand = strings.sidebarBanner?.brand?.trim();
 
-	if (partner && partner.length > 2) {
+	// A bare brand mention in prose is not a banner: it must come with box borders or the banner glyph.
+	const glyph = strings.sidebarBanner?.glyph;
+	const hasBannerChrome = /[╔═╗╚╝]/.test(combinedPlain) || Boolean(glyph && combinedPlain.includes(glyph));
+
+	if (hasBannerChrome && partner && partner.length > 2) {
 		const escapedPartner = partner.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		if (new RegExp(escapedPartner, "i").test(combinedPlain)) {
 			return true;
 		}
 	}
-	if (brand && brand.length > 2) {
+	if (hasBannerChrome && brand && brand.length > 2) {
 		const escapedBrand = brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		if (new RegExp(escapedBrand, "i").test(combinedPlain)) {
 			return true;
@@ -91,7 +95,7 @@ export function isAsciiArtOrBanner(lines: string[]): boolean {
 	if (
 		/neko[-_]?banner|neko[-_]?pi/i.test(combinedPlain) ||
 		/N\s*e\s*k\s*o\s*-\s*p\s*i/i.test(combinedPlain) ||
-		/banner|ascii[-_]?art/i.test(combinedPlain)
+		/ascii[-_]?art/i.test(combinedPlain)
 	) {
 		return true;
 	}
