@@ -22,6 +22,14 @@ import {
 	shortModelName,
 } from "./profiles-service.ts";
 import { getTaskManagerSummary } from "./profiles-task-sync.ts";
+import {
+	type SubagentTaskRecord,
+	collectSessionSubagentTasks,
+	loadGentleAgentsDiskTasks,
+	formatSubagentStatusTag,
+	formatTaskDuration,
+	extractTaskIdFromText,
+} from "./profiles-subagents.ts";
 
 /**
  * Extended SDD Profiles & Quotas Card for Sidebar.
@@ -42,6 +50,7 @@ export class WorkspaceProfilesExtendedCard implements Component {
 	private isExpanded = false;
 	private scrollOffset = 0;
 	private lastMaxScrollOffset = 0;
+	private liveTasks = new Map<string, SubagentTaskRecord>();
 
 	constructor(tui?: TUI, theme?: Theme, cwd?: string, ctx?: ExtensionContext, pi?: ExtensionAPI) {
 		this.tui = tui;
@@ -49,6 +58,78 @@ export class WorkspaceProfilesExtendedCard implements Component {
 		this.cwd = cwd;
 		this.ctx = ctx;
 		this.pi = pi;
+		this.subscribeLiveTasks();
+	}
+
+	private subscribeLiveTasks(): void {
+		const pi: any = this.pi;
+		if (!pi || typeof pi.on !== "function") return;
+		const refresh = () => this.tui?.requestRender();
+		const tracked = new Set(["subagent_run", "subagent_continue", "subagent_cancel"]);
+		try {
+			pi.on("tool_execution_start", (event: any) => {
+				if (!tracked.has(event?.toolName)) return;
+				const args = event.args ?? {};
+				if (event.toolName === "subagent_cancel") {
+					const target = this.liveTasks.get(String(args.task_id ?? ""));
+					if (target) {
+						target.status = "cancelled";
+						target.finishedAt = Date.now();
+					}
+				} else {
+					const taskText = String(args.task ?? args.prompt ?? "");
+					const id = String(event.toolCallId ?? `live-${this.liveTasks.size + 1}`);
+					this.liveTasks.set(id, {
+						id,
+						callId: event.toolCallId,
+						agent: String(args.agent ?? "subagent"),
+						label: String(args.label ?? (taskText.slice(0, 60) || args.agent || "subagent")),
+						task: taskText,
+						mode: args.mode === "background" ? "background" : "task",
+						status: "running",
+						startedAt: Date.now(),
+					});
+				}
+				refresh();
+			});
+			pi.on("tool_execution_end", (event: any) => {
+				if (!tracked.has(event?.toolName)) return;
+				const rec = [...this.liveTasks.values()].find((r) => r.callId === event.toolCallId);
+				if (rec) {
+					const text = JSON.stringify(event.result?.content ?? event.result ?? "");
+					const realId =
+						event.result?.details?.gentleAgents?.taskId || event.result?.details?.taskId || extractTaskIdFromText(text);
+					if (realId && realId !== rec.id) {
+						this.liveTasks.delete(rec.id);
+						rec.id = String(realId);
+						this.liveTasks.set(rec.id, rec);
+					}
+					if (event.isError) {
+						rec.status = "failed";
+						rec.finishedAt = Date.now();
+						rec.error = text.slice(0, 120);
+					} else if (rec.mode === "background") {
+						rec.resultSummary = "En background…";
+					} else if (rec.status === "running") {
+						rec.status = "completed";
+						rec.finishedAt = Date.now();
+					}
+				}
+				refresh();
+			});
+			pi.on("entry_appended", refresh);
+			pi.on("turn_end", refresh);
+		} catch {}
+	}
+
+	private collectDelegatedTasks(): SubagentTaskRecord[] {
+		const merged = new Map<string, SubagentTaskRecord>();
+		const cwd = this.cwd || (this.ctx as any)?.cwd;
+		const disk = cwd ? loadGentleAgentsDiskTasks(undefined, 5, undefined, cwd) : [];
+		for (const t of disk) merged.set(t.id, t);
+		for (const t of this.liveTasks.values()) merged.set(t.id, t);
+		for (const t of collectSessionSubagentTasks(this.ctx)) merged.set(t.id, t);
+		return [...merged.values()].sort((a, b) => b.startedAt - a.startedAt).slice(0, 5);
 	}
 
 	getSwitcherHitboxes(): SwitcherHitbox[] {
@@ -147,7 +228,7 @@ export class WorkspaceProfilesExtendedCard implements Component {
 		const bottom = frame(`${g.bl}${g.h.repeat(safeWidth - 2)}${g.br}`);
 		const divider = frame(`${g.dividerL || "├"}${g.h.repeat(safeWidth - 2)}${g.dividerR || "┤"}`);
 
-		const boxLine = (left: string, right = ""): string => {
+		const boxLine = (left: string, right = "", extraWidth = 0): string => {
 			let safeRight = right;
 			if (calcVisibleWidth(safeRight) > innerWidth) {
 				safeRight = truncateAnsiAware(safeRight, innerWidth);
@@ -156,7 +237,7 @@ export class WorkspaceProfilesExtendedCard implements Component {
 			const maxLeftWidth = Math.max(0, innerWidth - (rightWidth > 0 ? rightWidth + 1 : 0));
 			const truncatedLeft = truncateAnsiAware(left, maxLeftWidth);
 			const leftWidth = calcVisibleWidth(truncatedLeft);
-			const padLen = Math.max(0, innerWidth - leftWidth - rightWidth);
+			const padLen = Math.max(0, innerWidth - leftWidth - rightWidth - extraWidth);
 			const pad = " ".repeat(padLen);
 			return `${frame(g.v)} ${truncatedLeft}${pad}${safeRight} ${frame(g.v)}`;
 		};
@@ -549,6 +630,37 @@ export class WorkspaceProfilesExtendedCard implements Component {
 
 				// Quota bars (5h y Semanal)
 				renderModelQuotaBars(account, agentQuota);
+			}
+		}
+
+		// 3b. Delegated subagent tasks
+		const delegated = this.collectDelegatedTasks();
+		if (delegated.length > 0) {
+			bodyLines.push(divider);
+			const running = delegated.filter((t) => t.status === "running").length;
+			const completed = delegated.filter((t) => t.status === "completed").length;
+			const summaryRight =
+				running > 0
+					? `${c.mint(`${running} act`)} · ${c.dim(`${completed} ok`)}`
+					: c.dim(`${delegated.length} total`);
+			// ⚡ renders 2 cells wide in terminals but calcVisibleWidth counts 1
+			bodyLines.push(boxLine(`${c.accent("⚡ Subagentes Delegados")}`, summaryRight, 1));
+			for (const t of delegated) {
+				const style = getAgentStyle(t.agent);
+				const durationMs = (t.finishedAt ?? Date.now()) - t.startedAt;
+				bodyLines.push(
+					boxLine(
+						`${style.bullet} ${style.name(`[${t.agent}]`)} ${c.text(t.label)}`,
+						formatSubagentStatusTag(t.status, c),
+					),
+				);
+				bodyLines.push(
+					boxLine(
+						`   ${c.dim("ID:")} ${c.muted(t.id)} ${c.dim("·")} ${c.dim(t.mode === "background" ? "bg" : "task")} ${c.dim("·")} ${c.muted(formatTaskDuration(durationMs))}`,
+					),
+				);
+				if (t.error) bodyLines.push(boxLine(`   ${c.coral(`↳ ${t.error}`)}`));
+				else if (t.resultSummary) bodyLines.push(boxLine(`   ${c.dim(`↳ ${t.resultSummary}`)}`));
 			}
 		}
 

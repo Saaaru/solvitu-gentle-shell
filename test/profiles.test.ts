@@ -13,6 +13,10 @@ import {
 	loadProfileDetails,
 	WorkspaceProfilesExtendedCard,
 	getActiveProfileDetails,
+	collectSessionSubagentTasks,
+	loadGentleAgentsDiskTasks,
+	resetGentleAgentsTasksCache,
+	formatTaskDuration,
 } from "../src/solvi-profiles.ts";
 import { resetActiveProfileCache } from "../src/solvi-paths.ts";
 import { setCachedAccountsForTesting } from "../src/solvi-usage.ts";
@@ -571,6 +575,146 @@ test("solvi-profiles - dynamic multi-provider matching and single pool rendering
 		assert.ok(fullText.includes("100%"), "Worker with Argon must show 100% weekly quota");
 		// Verify dynamic label Semanal is rendered cleanly alongside the @testacct prefix
 		assert.ok(fullText.includes("@testacct · Semanal"), "Single-pool account must render @testacct · Semanal on first line");
+	} finally {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		resetAll();
+	}
+});
+
+const callEntry = (id: string, name: string, args: any, ts = 1000) => ({
+	type: "message",
+	message: { role: "assistant", timestamp: ts, content: [{ type: "toolCall", id, name, arguments: args }] },
+});
+const resultEntry = (toolCallId: string, text: string, extra: any = {}, ts = 5000) => ({
+	type: "message",
+	message: { role: "toolResult", toolCallId, timestamp: ts, content: [{ type: "text", text }], ...extra },
+});
+const sessionCtx = (entries: any[]) => ({ sessionManager: { getBranch: () => entries } });
+
+test("solvi-profiles - formatTaskDuration formats seconds and minutes", () => {
+	assert.equal(formatTaskDuration(0), "0s");
+	assert.equal(formatTaskDuration(12_400), "12s");
+	assert.equal(formatTaskDuration(125_000), "2m 5s");
+});
+
+test("solvi-profiles - collectSessionSubagentTasks handles task, background, failed and cancelled runs", () => {
+	const entries = [
+		callEntry("c1", "subagent_run", { agent: "gentle-ai-worker", label: "Fg job", task: "do it" }, 1000),
+		resultEntry("c1", "all good", { details: { gentleAgents: { taskId: "t-fg" } } }, 4000),
+		callEntry("c2", "subagent_run", { agent: "jd-judge-a", label: "Bg job", task: "bg", mode: "background" }, 1000),
+		resultEntry("c2", "Started in the background", { details: { gentleAgents: { taskId: "t-bg", mode: "background" } } }),
+		{ type: "custom_message", customType: "gentle-agents", content: "Subagent t-bg completed: finished ok", details: { taskId: "t-bg" }, timestamp: new Date(9000).toISOString() },
+		callEntry("c3", "subagent_run", { agent: "review-risk", label: "Bad job", task: "x" }, 1000),
+		resultEntry("c3", "boom exploded", { isError: true }),
+		callEntry("c4", "subagent_run", { agent: "research-scout", label: "Cancel job", task: "y", mode: "background" }, 1000),
+		resultEntry("c4", "running in the background", { details: { taskId: "t-cancel" } }),
+		callEntry("c5", "subagent_cancel", { task_id: "t-cancel" }, 6000),
+	];
+	const tasks = collectSessionSubagentTasks(sessionCtx(entries));
+	assert.equal(tasks.length, 4);
+	const fg = tasks.find((t) => t.id === "t-fg")!;
+	assert.equal(fg.status, "completed");
+	assert.equal(fg.mode, "task");
+	assert.equal(fg.finishedAt, 4000);
+	assert.equal(fg.resultSummary, "all good");
+	const bg = tasks.find((t) => t.id === "t-bg")!;
+	assert.equal(bg.mode, "background");
+	assert.equal(bg.status, "completed");
+	assert.equal(bg.finishedAt, 9000);
+	assert.match(bg.resultSummary!, /finished ok/);
+	const bad = tasks.find((t) => t.agent === "review-risk")!;
+	assert.equal(bad.status, "failed");
+	assert.match(bad.error!, /boom/);
+	assert.equal(tasks.find((t) => t.id === "t-cancel")!.status, "cancelled");
+
+	// Background run with no completion stays running
+	const running = collectSessionSubagentTasks(
+		sessionCtx([
+			callEntry("r1", "subagent_run", { agent: "x", task: "t", mode: "background" }),
+			resultEntry("r1", "ok", { details: { taskId: "t-run" } }),
+		]),
+	);
+	assert.equal(running[0].status, "running");
+	assert.equal(running[0].resultSummary, "En background…");
+	assert.deepEqual(collectSessionSubagentTasks(undefined), []);
+});
+
+test("solvi-profiles - loadGentleAgentsDiskTasks filters by targetCwd and parentSessionId", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-disk-tasks-"));
+	try {
+		const write = (id: string, task: any) =>
+			fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ task: { id, agent: "gentle-ai-worker", label: id, mode: "background", status: "completed", startedAt: 100, endedAt: 200, ...task } }));
+		const proj = path.join(dir, "proj");
+		write("in-root", { cwd: proj, parentSessionId: "s1" });
+		write("in-sub", { cwd: path.join(proj, "sub"), parentSessionId: "s2" });
+		write("other", { cwd: path.join(dir, "other") });
+		write("no-cwd", {});
+		fs.writeFileSync(path.join(dir, "bad.json"), "{nope");
+		resetGentleAgentsTasksCache();
+		const ids = (list: any[]) => list.map((t) => t.id).sort();
+		assert.deepEqual(ids(loadGentleAgentsDiskTasks(undefined, 10, dir, proj)), ["in-root", "in-sub"]);
+		resetGentleAgentsTasksCache();
+		assert.deepEqual(ids(loadGentleAgentsDiskTasks("s1", 10, dir, proj)), ["in-root"]);
+		resetGentleAgentsTasksCache();
+		assert.equal(loadGentleAgentsDiskTasks(undefined, 10, dir).length, 4);
+		resetGentleAgentsTasksCache();
+		assert.equal(loadGentleAgentsDiskTasks(undefined, 2, dir).length, 2);
+	} finally {
+		resetGentleAgentsTasksCache();
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("solvi-profiles - WorkspaceProfilesExtendedCard renders delegated subagents section within width and scroll", () => {
+	resetAll();
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-subagents-card-"));
+	try {
+		const projDir = path.join(tmpDir, ".pi", "profiles");
+		fs.mkdirSync(projDir, { recursive: true });
+		fs.writeFileSync(path.join(projDir, ".active"), "prof1", "utf8");
+		fs.writeFileSync(
+			path.join(projDir, "prof1.json"),
+			JSON.stringify({ name: "prof1", default_model: "cpamc/acc1/gemini-3.8-flash-high", default_effort: "high", model_profiles: {} }),
+		);
+		const mockTui: any = { requestRender: () => {} };
+
+		// No tasks: no section
+		const plain = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir).render(60);
+		assert.ok(!plain.join("\n").includes("Subagentes Delegados"));
+
+		const now = Date.now();
+		const entries = [
+			callEntry("c1", "subagent_run", { agent: "gentle-ai-worker", label: "Fg job", task: "a" }, now - 125_000),
+			resultEntry("c1", "all good", { details: { taskId: "t-fg" } }, now),
+			callEntry("c2", "subagent_run", { agent: "jd-judge-a", label: "Bg job", task: "b", mode: "background" }, now - 5000),
+			resultEntry("c2", "in the background", { details: { taskId: "t-bg" } }, now),
+			callEntry("c3", "subagent_run", { agent: "review-risk", label: "Bad job", task: "c" }, now - 3000),
+			resultEntry("c3", "kaboom", { isError: true }, now),
+			callEntry("c4", "subagent_run", { agent: "research-scout", label: "Cancel job", task: "d", mode: "background" }, now - 2000),
+			resultEntry("c4", "in the background", { details: { taskId: "t-cx" } }, now),
+			callEntry("c5", "subagent_cancel", { task_id: "t-cx" }, now - 1000),
+		];
+		const ctx: any = sessionCtx(entries);
+		const card = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir, ctx);
+		for (const w of [40, 60]) {
+			const lines = card.render(w);
+			for (const l of lines) assert.equal(visibleWidth(l), Math.max(30, w));
+		}
+		const text = card.render(60).join("\n");
+		assert.ok(text.includes("⚡ Subagentes Delegados"));
+		for (const needle of ["[gentle-ai-worker]", "Fg job", "[jd-judge-a]", "Bg job", "[review-risk]", "[research-scout]", "RUNNING", "DONE", "FAIL", "CANCEL", "ID: t-fg", "ID: t-bg", "bg", "2m 5s", "↳ kaboom", "En background…"]) {
+			assert.ok(text.includes(needle), `missing ${needle}`);
+		}
+
+		// Internal scrolling keeps exact height and width
+		const constrained = card.render(60, 14);
+		assert.equal(constrained.length, 14);
+		for (const l of constrained) assert.equal(visibleWidth(l), 60);
+		assert.ok(constrained.join("\n").includes("wheel scroll"));
+		assert.equal(card.handleRailWheel(1), true);
+		const scrolled = card.render(60, 14);
+		assert.equal(scrolled.length, 14);
+		for (const l of scrolled) assert.equal(visibleWidth(l), 60);
 	} finally {
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 		resetAll();
