@@ -14,3 +14,6 @@ export { fetchUsageAccounts as fetchQuotaAccounts } from "./solvi-usage.ts";
 
 // 4. Visual Card
 export { WorkspaceProfilesExtendedCard } from "./profiles/profiles-card.ts";
+
+// 5. Delegated subagent task tracking
+export * from "./profiles/profiles-subagents.ts";

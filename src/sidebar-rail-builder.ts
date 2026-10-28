@@ -6,7 +6,10 @@ import { loadSolviLayout } from "./solvi-layout.ts";
 import { WorkspaceProfilesExtendedCard } from "./solvi-profiles.ts";
 import { WorkspaceGitGraphCard, WorkspaceWorkingTreeCard, getGitSyncBadge } from "./solvi-git-graph.ts";
 import { bindGitRenderHost } from "./git/git-swr.ts";
-import { WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
+import { WorkspaceEngramCard, WorkspaceEngramHandoffCard } from "./solvi-engram.ts";
+import { WorkspaceEcosystemCard } from "./ecosystem/ecosystem-card.ts";
+import { WorkspaceToolsCard } from "./solvi-tools.ts";
+import { WorkspaceTodoMirror } from "./todos.ts";
 import { WorkspaceProjectTreeCard, WorkspaceFileViewerCard, getFolderState } from "./solvi-tree.ts";
 import { WorkspacePersistentMemoryCard } from "./solvi-persistent-memory.ts";
 import { WorkspaceSolviTabCard } from "./solvi-tab.ts";
@@ -157,6 +160,7 @@ const NO_UNIFY_KEYS = new Set([
 	"solvi-tab",
 	"yt",
 	"models",
+	"ecosystem",
 ]);
 
 /**
@@ -193,6 +197,23 @@ export function buildSidebarRailLines(ctx: RailBuilderContext): RailBuildResult 
 	const bannerLinesCount = (branding && branding.length) ? branding.length + 1 : 0;
 	const tabsLinesCount = tabsEnabled ? 2 : 0;
 	const headerLines = 1 + bannerLinesCount + tabsLinesCount + 1;
+
+	// Mount STACK cards up front so the todo height pass below measures every card preceding it.
+	for (const key of targetCardKeys) {
+		if (state.parts.get(key)) continue;
+		const cardCtx = ((tui as any)?.__solviCtx ?? { scopedModels: [], sessionManager: { getEntries: () => [] } }) as any;
+		if (key === "ecosystem") state.parts.set(key, new WorkspaceEcosystemCard(cardCtx, tui, theme));
+		else if (key === "engram") state.parts.set(key, new WorkspaceEngramCard(cardCtx, tui, theme));
+		else if (key === "tools") state.parts.set(key, new WorkspaceToolsCard(cardCtx, tui, theme));
+		else if (key === "todo") {
+			const mirror = (tui as any).__solviTodoMirror ?? new WorkspaceTodoMirror(cardCtx, tui, theme);
+			state.parts.set(key, (tui as any).__solviTodoRail ?? {
+				render: (w: number, h?: number) => mirror.renderRail(w, h),
+				invalidate: () => mirror.invalidate(),
+				handleRailWheel: (d: number) => mirror.handleRailWheel(d),
+			});
+		} else if (key === "models") state.parts.set(key, new WorkspaceModelsCard(cardCtx, tui, theme));
+	}
 
 	const priorPass = new Map<string, { component: unknown; raw: string[] }>();
 	let availableCardHeight: number | undefined;

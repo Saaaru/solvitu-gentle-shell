@@ -144,6 +144,8 @@ test("sidebar tabs - resolveSidebarTab resolves by id and by key", () => {
 
 	// SIDEBAR_TAB_CARD_MAP checks - clean canonical 5 tabs
 	assert.ok(SIDEBAR_TAB_CARD_MAP.prof.includes("solvi-profiles"), "SIDEBAR_TAB_CARD_MAP.prof must include solvi-profiles");
+	assert.deepEqual(SIDEBAR_TAB_CARD_MAP.mem, ["ecosystem", "models", "engram", "tools", "todo"]);
+	assert.deepEqual(SIDEBAR_TAB_CARD_MAP.git, ["gitGraph", "workingTree"]);
 	assert.equal(SIDEBAR_TAB_CARD_MAP.agents, undefined, "legacy agents should be pruned from map");
 	assert.equal(SIDEBAR_TAB_CARD_MAP.forge, undefined, "legacy forge should be pruned from map");
 	assert.equal(SIDEBAR_TAB_CARD_MAP.usage, undefined, "legacy usage should be pruned from map");

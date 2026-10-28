@@ -13,6 +13,10 @@ import {
 	loadProfileDetails,
 	WorkspaceProfilesExtendedCard,
 	getActiveProfileDetails,
+	collectSessionSubagentTasks,
+	loadGentleAgentsDiskTasks,
+	resetGentleAgentsTasksCache,
+	formatTaskDuration,
 } from "../src/solvi-profiles.ts";
 import { resetActiveProfileCache } from "../src/solvi-paths.ts";
 import { setCachedAccountsForTesting } from "../src/solvi-usage.ts";
@@ -300,47 +304,26 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard renders switcher, accounts,
 		const linesWithButtons = lines.filter((l) => l.includes("[●") || l.includes("[○"));
 		assert.ok(linesWithButtons.length >= 2, "Should wrap profile buttons across multiple lines dynamically");
 
-		// 2. Real quota bars for ranchesca and nekocin01 (5h + Semanal), graceful fallback for cinlo_dig
-		assert.ok(fullText.includes("ranchesca"), "Should list ranchesca account");
-		assert.ok(fullText.includes("85%"), "Should show 85% 5h quota for ranchesca");
-		assert.ok(fullText.includes("90%"), "Should show 90% weekly quota for ranchesca");
-		assert.ok(fullText.includes("nekocin01"), "Should list nekocin01 account");
-		assert.ok(fullText.includes("30%"), "Should show 30% 5h quota for nekocin01");
-		assert.ok(fullText.includes("45%"), "Should show 45% weekly quota for nekocin01");
-		assert.ok(fullText.includes("cinlo_dig"), "Should list cinlo_dig account");
-		assert.ok(fullText.includes("5h"), "Should show 5h quota label");
-		assert.ok(fullText.includes("Semanal"), "Should show Semanal quota label");
+		// 2. Compact format: no accounts, quota, gauges, or effort
+		const plainText = fullText.replace(/\x1b\[[0-9;]*m/g, "");
+		for (const banned of ["@", "sin cuota", "▰", "▱", "(high)", "(medium)", "(low)", "%", "Semanal"]) {
+			assert.ok(!plainText.includes(banned), `Compact card must not render ${banned}`);
+		}
 
-		// 3. Flat subagent list structure & 3 lines per agent with full-width bars
+		// 3. One line per role with short model name on the right
 		assert.ok(/host \/ orquestador/i.test(fullText), "Should render Host orchestrator");
-		assert.ok(fullText.includes("gentle-ai-explore"), "Should render gentle-ai-explore");
-		assert.ok(fullText.includes("gentle-ai-worker"), "Should render gentle-ai-worker");
 		assert.ok(!fullText.includes("ODD Core"), "Should not contain old collapsible category ODD Core");
 		assert.ok(!fullText.includes("Judgment Day"), "Should not contain old collapsible category Judgment Day");
-		assert.ok(fullText.includes("sin cuota"), "Should show sin cuota fallback for cinlo_dig");
-		assert.ok(fullText.includes("▰"), "Should render gauge filled glyph");
-		assert.ok(fullText.includes("▱"), "Should render gauge empty glyph");
-
-		// 4. Full-width bar check: lines spanning full innerWidth
-		const innerWidth = 52 - 4; // 48
-		const fullGaugeLines = lines.filter((l) => {
-			const cleaned = l.replace(/\x1b\[[0-9;]*m/g, "");
-			return (cleaned.includes("▰") || cleaned.includes("▱")) && !cleaned.includes("@") && !cleaned.includes("%");
-		});
-		assert.ok(fullGaugeLines.length >= 3, "Should have dedicated full-width gauge lines below accounts");
-		// Check that fallback gauge for unavailable quota is entirely empty glyphs
-		const fallbackGauge = fullGaugeLines.find((l) => {
-			const cleaned = l.replace(/\x1b\[[0-9;]*m/g, "");
-			return cleaned.includes("▱".repeat(innerWidth));
-		});
-		assert.ok(fallbackGauge, "Should have a gauge line with full empty glyphs for account without quota");
-
-		// Check breathing room spacer lines between agents
-		const emptySpacerLines = lines.filter((l) => {
-			const cleaned = l.replace(/\x1b\[[0-9;]*m/g, "");
-			return cleaned.startsWith("│") && cleaned.endsWith("│") && cleaned.slice(1, -1).trim() === "";
-		});
-		assert.ok(emptySpacerLines.length >= 2, "Should have empty spacer lines between agents for breathing room");
+		const plainLines = lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ""));
+		for (const needle of ["host / orquestador", "gentle-ai-explore", "gentle-ai-worker"]) {
+			const matching = plainLines.filter((l) => l.includes(needle));
+			assert.equal(matching.length, 1, `${needle} must render on exactly one line`);
+			assert.ok(/gemini/i.test(matching[0]), `${needle} line must carry the short model name`);
+		}
+		const emptySpacerLines = plainLines.filter(
+			(l) => l.startsWith("│") && l.endsWith("│") && l.slice(1, -1).trim() === "",
+		);
+		assert.equal(emptySpacerLines.length, 0, "Should not render blank spacer lines between agents");
 
 		// 5. Task Manager status summary
 		assert.ok(fullText.includes("Task Manager"), "Should render Task Manager status");
@@ -362,13 +345,8 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard renders switcher, accounts,
 		const activeAfter = fs.readFileSync(path.join(projDir, ".active"), "utf8").trim();
 		assert.equal(activeAfter, "cinlo2", "Active profile should be switched to cinlo2");
 
-		// 7. Test clicking effort toggles agent effort (e.g. gentle-ai-worker low -> medium -> high)
-		const effortHitbox = hitboxes.find((h) => h.type === "effort-agent" && h.agentId === "gentle-ai-worker");
-		assert.ok(effortHitbox, "Effort hitbox for gentle-ai-worker must exist");
-		renderRequested = false;
-		const effortClickHandled = card.handleRailClick(effortHitbox.lineIndex, "left", effortHitbox.startX + 1);
-		assert.ok(effortClickHandled, "Click on effort hitbox should be handled");
-		assert.ok(renderRequested, "requestRender should be called on effort toggle");
+		// 7. Effort is no longer rendered, so no effort hitboxes exist
+		assert.ok(!hitboxes.some((h) => h.type === "effort-agent" || h.type === "effort-host"), "No effort hitboxes");
 
 		// 8. Test wheel on profiles card is disabled to preserve natural sidebar vertical scrolling
 		renderRequested = false;
@@ -428,9 +406,9 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard internal scrolling and heig
 
 		const card = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir);
 
-		// 1. Calling render(52, 25) constrains lines to exactly 25
-		const lines = card.render(52, 25);
-		assert.equal(lines.length, 25, "Lines must be constrained to exactly 25");
+		// 1. Calling render(52, 9) constrains lines to exactly 9 (8 compact body lines overflow 5 available)
+		const lines = card.render(52, 9);
+		assert.equal(lines.length, 9, "Lines must be constrained to exactly 9");
 
 		// Top header and divider should be intact
 		assert.ok(lines[0].includes("Profiles & Clusters"), "Header must be at the top");
@@ -444,8 +422,8 @@ test("solvi-profiles - WorkspaceProfilesExtendedCard internal scrolling and heig
 		assert.equal(wheelDownHandled, true, "Wheel down should be handled internally");
 		assert.equal(renderRequested, true, "requestRender should be called on scroll");
 
-		const scrolledLines = card.render(52, 25);
-		assert.equal(scrolledLines.length, 25, "Scrolled lines must still equal 25");
+		const scrolledLines = card.render(52, 9);
+		assert.equal(scrolledLines.length, 9, "Scrolled lines must still equal 25");
 		const scrolledText = scrolledLines.join("\n");
 		assert.ok(scrolledText.includes("arriba"), "Should indicate scrolled lines above");
 
@@ -505,7 +483,7 @@ test("solvi-profiles - edge cases for account extraction and empty profiles", ()
 	assert.equal(loadProfileDetails("does-not-exist-xyz", "/tmp"), null);
 });
 
-test("solvi-profiles - dynamic multi-provider matching and single pool rendering (Gemini/Argon & Codex)", () => {
+test("solvi-profiles - compact host and subagent rows ignore provider quota pools", () => {
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-profiles-provider-"));
 	const profilesDir = path.join(tmpDir, ".pi", "profiles");
 	fs.mkdirSync(profilesDir, { recursive: true });
@@ -560,17 +538,157 @@ test("solvi-profiles - dynamic multi-provider matching and single pool rendering
 		const lines = card.render(50);
 		const fullText = lines.join("\n");
 
-		// 1. Host using GPT must resolve to codex 'cilon-gpt' (67% 5h, 81% Semanal), NOT antigravity 'cilon' (10%)
-		assert.ok(fullText.includes("cilon-gpt"), "Host with GPT model must match codex cilon-gpt");
-		assert.ok(fullText.includes("67%"), "Host must display 67% from codex account");
-		assert.ok(fullText.includes("81%"), "Host must display 81% from codex account");
-		assert.ok(!fullText.includes("10%"), "Host must NOT accidentally match antigravity cilon account");
+		// Compact: host + worker on one line each, short model names, no quota/account data
+		const plain = fullText.replace(/\x1b\[[0-9;]*m/g, "");
+		for (const banned of ["@", "cilon", "testacct", "%", "Semanal", "sin cuota"]) {
+			assert.ok(!plain.includes(banned), `Compact card must not render ${banned}`);
+		}
+		const plainRows = plain.split(/\n/);
+		const hostLine = plainRows.filter((l) => l.includes("host / orquestador"));
+		assert.equal(hostLine.length, 1);
+		const workerLine = plainRows.filter((l) => l.includes("gentle-ai-worker"));
+		assert.equal(workerLine.length, 1);
+		for (const l of lines) assert.equal(visibleWidth(l), 50);
+	} finally {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		resetAll();
+	}
+});
 
-		// 2. Worker using Gemini/Argon in testacct has only 1 weekly pool (100%)
-		assert.ok(fullText.includes("testacct"), "Worker must list testacct account");
-		assert.ok(fullText.includes("100%"), "Worker with Argon must show 100% weekly quota");
-		// Verify dynamic label Semanal is rendered cleanly alongside the @testacct prefix
-		assert.ok(fullText.includes("@testacct · Semanal"), "Single-pool account must render @testacct · Semanal on first line");
+const callEntry = (id: string, name: string, args: any, ts = 1000) => ({
+	type: "message",
+	message: { role: "assistant", timestamp: ts, content: [{ type: "toolCall", id, name, arguments: args }] },
+});
+const resultEntry = (toolCallId: string, text: string, extra: any = {}, ts = 5000) => ({
+	type: "message",
+	message: { role: "toolResult", toolCallId, timestamp: ts, content: [{ type: "text", text }], ...extra },
+});
+const sessionCtx = (entries: any[]) => ({ sessionManager: { getBranch: () => entries } });
+
+test("solvi-profiles - formatTaskDuration formats seconds and minutes", () => {
+	assert.equal(formatTaskDuration(0), "0s");
+	assert.equal(formatTaskDuration(12_400), "12s");
+	assert.equal(formatTaskDuration(125_000), "2m 5s");
+});
+
+test("solvi-profiles - collectSessionSubagentTasks handles task, background, failed and cancelled runs", () => {
+	const entries = [
+		callEntry("c1", "subagent_run", { agent: "gentle-ai-worker", label: "Fg job", task: "do it" }, 1000),
+		resultEntry("c1", "all good", { details: { gentleAgents: { taskId: "t-fg" } } }, 4000),
+		callEntry("c2", "subagent_run", { agent: "jd-judge-a", label: "Bg job", task: "bg", mode: "background" }, 1000),
+		resultEntry("c2", "Started in the background", { details: { gentleAgents: { taskId: "t-bg", mode: "background" } } }),
+		{ type: "custom_message", customType: "gentle-agents", content: "Subagent t-bg completed: finished ok", details: { taskId: "t-bg" }, timestamp: new Date(9000).toISOString() },
+		callEntry("c3", "subagent_run", { agent: "review-risk", label: "Bad job", task: "x" }, 1000),
+		resultEntry("c3", "boom exploded", { isError: true }),
+		callEntry("c4", "subagent_run", { agent: "research-scout", label: "Cancel job", task: "y", mode: "background" }, 1000),
+		resultEntry("c4", "running in the background", { details: { taskId: "t-cancel" } }),
+		callEntry("c5", "subagent_cancel", { task_id: "t-cancel" }, 6000),
+	];
+	const tasks = collectSessionSubagentTasks(sessionCtx(entries));
+	assert.equal(tasks.length, 4);
+	const fg = tasks.find((t) => t.id === "t-fg")!;
+	assert.equal(fg.status, "completed");
+	assert.equal(fg.mode, "task");
+	assert.equal(fg.finishedAt, 4000);
+	assert.equal(fg.resultSummary, "all good");
+	const bg = tasks.find((t) => t.id === "t-bg")!;
+	assert.equal(bg.mode, "background");
+	assert.equal(bg.status, "completed");
+	assert.equal(bg.finishedAt, 9000);
+	assert.match(bg.resultSummary!, /finished ok/);
+	const bad = tasks.find((t) => t.agent === "review-risk")!;
+	assert.equal(bad.status, "failed");
+	assert.match(bad.error!, /boom/);
+	assert.equal(tasks.find((t) => t.id === "t-cancel")!.status, "cancelled");
+
+	// Background run with no completion stays running
+	const running = collectSessionSubagentTasks(
+		sessionCtx([
+			callEntry("r1", "subagent_run", { agent: "x", task: "t", mode: "background" }),
+			resultEntry("r1", "ok", { details: { taskId: "t-run" } }),
+		]),
+	);
+	assert.equal(running[0].status, "running");
+	assert.equal(running[0].resultSummary, "En background…");
+	assert.deepEqual(collectSessionSubagentTasks(undefined), []);
+});
+
+test("solvi-profiles - loadGentleAgentsDiskTasks filters by targetCwd and parentSessionId", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-disk-tasks-"));
+	try {
+		const write = (id: string, task: any) =>
+			fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ task: { id, agent: "gentle-ai-worker", label: id, mode: "background", status: "completed", startedAt: 100, endedAt: 200, ...task } }));
+		const proj = path.join(dir, "proj");
+		write("in-root", { cwd: proj, parentSessionId: "s1" });
+		write("in-sub", { cwd: path.join(proj, "sub"), parentSessionId: "s2" });
+		write("other", { cwd: path.join(dir, "other") });
+		write("no-cwd", {});
+		fs.writeFileSync(path.join(dir, "bad.json"), "{nope");
+		resetGentleAgentsTasksCache();
+		const ids = (list: any[]) => list.map((t) => t.id).sort();
+		assert.deepEqual(ids(loadGentleAgentsDiskTasks(undefined, 10, dir, proj)), ["in-root", "in-sub"]);
+		resetGentleAgentsTasksCache();
+		assert.deepEqual(ids(loadGentleAgentsDiskTasks("s1", 10, dir, proj)), ["in-root"]);
+		resetGentleAgentsTasksCache();
+		assert.equal(loadGentleAgentsDiskTasks(undefined, 10, dir).length, 4);
+		resetGentleAgentsTasksCache();
+		assert.equal(loadGentleAgentsDiskTasks(undefined, 2, dir).length, 2);
+	} finally {
+		resetGentleAgentsTasksCache();
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("solvi-profiles - WorkspaceProfilesExtendedCard renders delegated subagents section within width and scroll", () => {
+	resetAll();
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "solvi-subagents-card-"));
+	try {
+		const projDir = path.join(tmpDir, ".pi", "profiles");
+		fs.mkdirSync(projDir, { recursive: true });
+		fs.writeFileSync(path.join(projDir, ".active"), "prof1", "utf8");
+		fs.writeFileSync(
+			path.join(projDir, "prof1.json"),
+			JSON.stringify({ name: "prof1", default_model: "cpamc/acc1/gemini-3.8-flash-high", default_effort: "high", model_profiles: {} }),
+		);
+		const mockTui: any = { requestRender: () => {} };
+
+		// No tasks: no section
+		const plain = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir).render(60);
+		assert.ok(!plain.join("\n").includes("Subagentes Delegados"));
+
+		const now = Date.now();
+		const entries = [
+			callEntry("c1", "subagent_run", { agent: "gentle-ai-worker", label: "Fg job", task: "a" }, now - 125_000),
+			resultEntry("c1", "all good", { details: { taskId: "t-fg" } }, now),
+			callEntry("c2", "subagent_run", { agent: "jd-judge-a", label: "Bg job", task: "b", mode: "background" }, now - 5000),
+			resultEntry("c2", "in the background", { details: { taskId: "t-bg" } }, now),
+			callEntry("c3", "subagent_run", { agent: "review-risk", label: "Bad job", task: "c" }, now - 3000),
+			resultEntry("c3", "kaboom", { isError: true }, now),
+			callEntry("c4", "subagent_run", { agent: "research-scout", label: "Cancel job", task: "d", mode: "background" }, now - 2000),
+			resultEntry("c4", "in the background", { details: { taskId: "t-cx" } }, now),
+			callEntry("c5", "subagent_cancel", { task_id: "t-cx" }, now - 1000),
+		];
+		const ctx: any = sessionCtx(entries);
+		const card = new WorkspaceProfilesExtendedCard(mockTui, undefined, tmpDir, ctx);
+		for (const w of [40, 60]) {
+			const lines = card.render(w);
+			for (const l of lines) assert.equal(visibleWidth(l), Math.max(30, w));
+		}
+		const text = card.render(60).join("\n");
+		assert.ok(text.includes("⚡ Subagentes Delegados"));
+		for (const needle of ["[gentle-ai-worker]", "Fg job", "[jd-judge-a]", "Bg job", "[review-risk]", "[research-scout]", "RUNNING", "DONE", "FAIL", "CANCEL", "ID: t-fg", "ID: t-bg", "bg", "2m 5s", "↳ kaboom", "En background…"]) {
+			assert.ok(text.includes(needle), `missing ${needle}`);
+		}
+
+		// Internal scrolling keeps exact height and width
+		const constrained = card.render(60, 14);
+		assert.equal(constrained.length, 14);
+		for (const l of constrained) assert.equal(visibleWidth(l), 60);
+		assert.ok(constrained.join("\n").includes("wheel scroll"));
+		assert.equal(card.handleRailWheel(1), true);
+		const scrolled = card.render(60, 14);
+		assert.equal(scrolled.length, 14);
+		for (const l of scrolled) assert.equal(visibleWidth(l), 60);
 	} finally {
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 		resetAll();

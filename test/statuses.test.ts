@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as os from "node:os";
 import * as path from "node:path";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { resetAll } from "./test-helpers.ts";
 import { WorkspaceStatuses } from "../src/statuses.ts";
 import { WorkspaceHeader } from "../src/header.ts";
@@ -40,6 +41,9 @@ test("WorkspaceStatuses - renders model, tokens, window, threshold and limits on
 
 	assert.equal(lines.length, 1, "must be a single row");
 	const line = lines[0]!;
+	assert.ok(/~[\\/]test/.test(line), "row includes the shortened cwd");
+	assert.ok(!line.includes(os.homedir()), "row does not leak the absolute home path");
+	assert.ok(line.indexOf("test") < line.indexOf("claude-opus-4-8"), "cwd comes first");
 	assert.ok(line.includes("claude-opus-4-8"), "row includes the model");
 	assert.ok(line.includes("12.0k"), "row includes used tokens");
 	assert.ok(line.includes("200k"), "row includes the context window");
@@ -84,6 +88,7 @@ test("WorkspaceStatuses - truncates the row to the terminal width", () => {
 		const lines = widget.render(width);
 		assert.equal(lines.length, 1, `one row at width ${width}`);
 		assert.ok(lines[0]!.length > 0, `non-empty row at width ${width}`);
+		assert.ok(visibleWidth(lines[0]!) <= width, `row fits width ${width}`);
 	}
 });
 

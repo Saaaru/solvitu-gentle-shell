@@ -9,6 +9,7 @@ import {
 	transformTranscriptLines,
 	safeFg,
 	bolden,
+	stripAnsi,
 } from "../src/solvi-theme.ts";
 import {
 	frameCategoryBox,
@@ -565,6 +566,41 @@ test("formatTranscriptChildren - memory calls are individual Solvitu cards, no l
 	assert.ok(cardSlice.includes("plain prose stays free"));
 	assert.equal(mouseChildren.filter((m) => m.component === children[0] || m.component === children[1] || m.component === children[3]).length, 3, "each card keeps its own mouse target");
 });
+
+test("formatTranscriptChildren - a thinking-only assistant message becomes a compact thinking box", () => {
+	class AssistantMessageComponent {
+		lastMessage = { content: [{ type: "thinking", thinking: "internal reasoning..." }] };
+		render() { return ["internal reasoning..."]; }
+	}
+	const { lines } = formatTranscriptChildren([new AssistantMessageComponent() as any], 60, mockThemeFor());
+	const plain = lines.map((l) => stripAnsi(l).replace(/[/?[a-zA-Z]+]/g, "")).join("\n");
+	assert.ok(plain.includes("┌─ thinking"));
+	assert.ok(!plain.includes("el Gentleman"));
+	assert.ok(!plain.includes("internal reasoning..."));
+});
+
+test("formatTranscriptChildren - an assistant reply with thinking hides it and stays framed even when it mentions the brand", () => {
+	class AssistantMessageComponent {
+		lastMessage = {
+			content: [
+				{ type: "thinking", thinking: "secret thought" },
+				{ type: "text", text: "Respuesta sobre solvitu-gentle-shell y gentle-shell" },
+			],
+		};
+		render() { return ["thinking", "Respuesta sobre solvitu-gentle-shell y gentle-shell"]; }
+	}
+	const { lines } = formatTranscriptChildren([new AssistantMessageComponent() as any], 80, mockThemeFor());
+	const plainLines = lines.map((l) => stripAnsi(l).replace(/[/?[a-zA-Z]+]/g, ""));
+	const plain = plainLines.join("\n");
+	assert.ok(plainLines.some((l) => l.startsWith("┌─ 🤖 el Gentleman")));
+	assert.ok(plain.includes("Respuesta sobre solvitu-gentle-shell"));
+	assert.ok(!plain.includes("secret thought"));
+	assert.ok(!plainLines.some((l) => l.trim() === "│ thinking" || /^│\s*thinking\s*│?$/.test(l.trim())));
+});
+
+function mockThemeFor(): any {
+	return { fg: (role: string, text: string) => `[${role}]${text}[/${role}]` };
+}
 
 test("transformTranscriptLines - bolds markdown headings, leaves code fences alone", () => {
 	const mockTheme = {

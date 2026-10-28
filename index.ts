@@ -6,7 +6,7 @@ import { footerRegistry } from "./src/footer/footer-registry.ts";
 import { moveSelection, openSelected } from "./src/main-view.ts";
 import { registerTreeKeys } from "./src/tree/tree-keys.ts";
 import { registerSpotifyCommands } from "./src/spotify/spotify-commands.ts";
-import { registerSidebarArrowKeys } from "./src/sidebar-arrow-keys.ts";
+import { registerSidebarArrowKeys, navigateActiveSidebarTab } from "./src/sidebar-arrow-keys.ts";
 import { registerSidebarToggle } from "./src/sidebar-visibility.ts";
 import { syncProjectCloud, detectProjectName } from "./src/solvi-engram.ts";
 import { SolviContextMonitor } from "./src/solvi-context-monitor.ts";
@@ -67,31 +67,8 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 	// app.models.reorderUp/Down) nor Alt+K (reserved by gentle-pi's command palette,
 	// gentle:commands) are available: the loader flags either as a startup
 	// "Extension shortcut conflict", and Alt+K silently loses to gentle-pi's own binding.
-	const scrollActiveTab = (delta: number) => {
-		const tui = footerRegistry.latestTodoTui;
-		if (!tui?.terminal) return;
-		const tab = resolveSidebarTab(sidebarState(tui).activeTabId);
-		if (tab.id === "skills") {
-			if (footerRegistry.mainView) moveSelection(footerRegistry.mainView, delta);
-			return;
-		}
-		const card =
-			tab.id === "tree"
-				? footerRegistry.latestProjectTree
-				: tab.id === "git"
-					? (footerRegistry.latestGitGraph ?? footerRegistry.latestWorkingTree)
-					: tab.id === "prof"
-						? footerRegistry.latestProfilesCard
-						: tab.id === "mem"
-							? (footerRegistry.latestEngramCard ?? footerRegistry.latestToolsCard ?? footerRegistry.latestPersistentMemory)
-							: undefined;
-		if (card && typeof (card as any).handleRailWheel === "function") {
-			(card as any).handleRailWheel(delta);
-			tui.requestRender();
-		}
-	};
-	pi.registerShortcut("alt+i", { description: "Scroll active tab up", handler: () => scrollActiveTab(-1) });
-	pi.registerShortcut("alt+j", { description: "Scroll active tab down", handler: () => scrollActiveTab(1) });
+	pi.registerShortcut("alt+i", { description: "Scroll active tab up", handler: () => navigateActiveSidebarTab(-1) });
+	pi.registerShortcut("alt+j", { description: "Scroll active tab down", handler: () => navigateActiveSidebarTab(1) });
 	// FLDR tab: Alt+C/X cursor, Alt+. / Alt+, expand/collapse, Alt+PageUp/PageDown scroll the viewer
 	registerTreeKeys(pi);
 	registerSpotifyCommands(pi);
@@ -109,6 +86,7 @@ export default function workspaceSidebarExtension(pi: ExtensionAPI): void {
 		ensureCliProxyApiRunning().catch(() => {});
 
 		if (!ctx.hasUI) return;
+		(ctx.ui as any)?.setHiddenThinkingLabel?.("thinking");
 
 		// Intercept ctx.ui.setWidget so the todo widget always renders in the sidebar rail slot.
 		if (ctx.ui && typeof ctx.ui.setWidget === "function" && !(ctx.ui as any).__solviSetWidgetWrapped) {

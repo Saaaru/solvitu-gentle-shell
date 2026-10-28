@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, type Component, type TUI } from "@earendil-works/pi-tui";
 import { solviPalette } from "./solvi-theme.ts";
@@ -6,9 +7,9 @@ import { shortModelName } from "./footer/footer-formatters.ts";
 import { footerRegistry } from "./footer/footer-registry.ts";
 import { cleanDynamicPoolLabel, getCachedAccounts, getQuotaThreshold, triggerUsageRefresh } from "./solvi-usage.ts";
 
-// Single line below the input: model, tokens/context window, threshold label and the
+// Single line below the input: cwd, model, tokens/context window, threshold label and the
 // 5h/weekly plan limits share the row with the extension statuses (Permissions, engram...).
-// The header above keeps only the path and the git branch.
+// The header above keeps the path and the git branch.
 export class WorkspaceStatuses implements Component {
 	private readonly ctx: ExtensionContext;
 	private readonly theme: any;
@@ -46,7 +47,9 @@ export class WorkspaceStatuses implements Component {
 		const dim = (s: string) => this.theme.fg("dim", s);
 
 		const model = shortModelName(this.ctx.model?.id ?? "no-model");
+		const cwd = (this.ctx.cwd ?? process.cwd()).replace(homedir(), "~");
 		const core = [
+			this.theme.fg("muted", cwd),
 			`${this.theme.fg("accent", model)}`,
 			`${threshold.color(`${formatTokenCount(tokens)} / ${formatTokenCount(contextWindow)} tokens`)}`,
 			`${threshold.color(`${threshold.label} ${Math.round(percent)}%`)}`,

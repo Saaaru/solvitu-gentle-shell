@@ -4,24 +4,23 @@ import { solviGlyphs, solviPalette, safeFg, bolden } from "../solvi-theme.ts";
 import { loadSolviColors } from "../solvi-colors.ts";
 import { calcVisibleWidth, truncateAnsiAware } from "../solvi-transcript.ts";
 import {
-	getCachedAccounts,
-	getQuotaThreshold,
-	triggerUsageRefresh,
-	formatRelativeReset,
-	cleanDynamicPoolLabel,
-	type QuotaPoolDisplay,
-} from "../solvi-usage.ts";
-import {
 	type SwitcherHitbox,
 	type ProfileItem,
 	listAvailableProfiles,
 	getActiveProfileDetails,
 	switchProfile,
 	toggleProfileEffort,
-	extractAccountFromModel,
 	shortModelName,
 } from "./profiles-service.ts";
 import { getTaskManagerSummary } from "./profiles-task-sync.ts";
+import {
+	type SubagentTaskRecord,
+	collectSessionSubagentTasks,
+	loadGentleAgentsDiskTasks,
+	formatSubagentStatusTag,
+	formatTaskDuration,
+	extractTaskIdFromText,
+} from "./profiles-subagents.ts";
 
 /**
  * Extended SDD Profiles & Quotas Card for Sidebar.
@@ -42,6 +41,7 @@ export class WorkspaceProfilesExtendedCard implements Component {
 	private isExpanded = false;
 	private scrollOffset = 0;
 	private lastMaxScrollOffset = 0;
+	private liveTasks = new Map<string, SubagentTaskRecord>();
 
 	constructor(tui?: TUI, theme?: Theme, cwd?: string, ctx?: ExtensionContext, pi?: ExtensionAPI) {
 		this.tui = tui;
@@ -49,6 +49,78 @@ export class WorkspaceProfilesExtendedCard implements Component {
 		this.cwd = cwd;
 		this.ctx = ctx;
 		this.pi = pi;
+		this.subscribeLiveTasks();
+	}
+
+	private subscribeLiveTasks(): void {
+		const pi: any = this.pi;
+		if (!pi || typeof pi.on !== "function") return;
+		const refresh = () => this.tui?.requestRender();
+		const tracked = new Set(["subagent_run", "subagent_continue", "subagent_cancel"]);
+		try {
+			pi.on("tool_execution_start", (event: any) => {
+				if (!tracked.has(event?.toolName)) return;
+				const args = event.args ?? {};
+				if (event.toolName === "subagent_cancel") {
+					const target = this.liveTasks.get(String(args.task_id ?? ""));
+					if (target) {
+						target.status = "cancelled";
+						target.finishedAt = Date.now();
+					}
+				} else {
+					const taskText = String(args.task ?? args.prompt ?? "");
+					const id = String(event.toolCallId ?? `live-${this.liveTasks.size + 1}`);
+					this.liveTasks.set(id, {
+						id,
+						callId: event.toolCallId,
+						agent: String(args.agent ?? "subagent"),
+						label: String(args.label ?? (taskText.slice(0, 60) || args.agent || "subagent")),
+						task: taskText,
+						mode: args.mode === "background" ? "background" : "task",
+						status: "running",
+						startedAt: Date.now(),
+					});
+				}
+				refresh();
+			});
+			pi.on("tool_execution_end", (event: any) => {
+				if (!tracked.has(event?.toolName)) return;
+				const rec = [...this.liveTasks.values()].find((r) => r.callId === event.toolCallId);
+				if (rec) {
+					const text = JSON.stringify(event.result?.content ?? event.result ?? "");
+					const realId =
+						event.result?.details?.gentleAgents?.taskId || event.result?.details?.taskId || extractTaskIdFromText(text);
+					if (realId && realId !== rec.id) {
+						this.liveTasks.delete(rec.id);
+						rec.id = String(realId);
+						this.liveTasks.set(rec.id, rec);
+					}
+					if (event.isError) {
+						rec.status = "failed";
+						rec.finishedAt = Date.now();
+						rec.error = text.slice(0, 120);
+					} else if (rec.mode === "background") {
+						rec.resultSummary = "En background…";
+					} else if (rec.status === "running") {
+						rec.status = "completed";
+						rec.finishedAt = Date.now();
+					}
+				}
+				refresh();
+			});
+			pi.on("entry_appended", refresh);
+			pi.on("turn_end", refresh);
+		} catch {}
+	}
+
+	private collectDelegatedTasks(): SubagentTaskRecord[] {
+		const merged = new Map<string, SubagentTaskRecord>();
+		const cwd = this.cwd || (this.ctx as any)?.cwd;
+		const disk = cwd ? loadGentleAgentsDiskTasks(undefined, 5, undefined, cwd) : [];
+		for (const t of disk) merged.set(t.id, t);
+		for (const t of this.liveTasks.values()) merged.set(t.id, t);
+		for (const t of collectSessionSubagentTasks(this.ctx)) merged.set(t.id, t);
+		return [...merged.values()].sort((a, b) => b.startedAt - a.startedAt).slice(0, 5);
 	}
 
 	getSwitcherHitboxes(): SwitcherHitbox[] {
@@ -147,7 +219,7 @@ export class WorkspaceProfilesExtendedCard implements Component {
 		const bottom = frame(`${g.bl}${g.h.repeat(safeWidth - 2)}${g.br}`);
 		const divider = frame(`${g.dividerL || "├"}${g.h.repeat(safeWidth - 2)}${g.dividerR || "┤"}`);
 
-		const boxLine = (left: string, right = ""): string => {
+		const boxLine = (left: string, right = "", extraWidth = 0): string => {
 			let safeRight = right;
 			if (calcVisibleWidth(safeRight) > innerWidth) {
 				safeRight = truncateAnsiAware(safeRight, innerWidth);
@@ -156,7 +228,7 @@ export class WorkspaceProfilesExtendedCard implements Component {
 			const maxLeftWidth = Math.max(0, innerWidth - (rightWidth > 0 ? rightWidth + 1 : 0));
 			const truncatedLeft = truncateAnsiAware(left, maxLeftWidth);
 			const leftWidth = calcVisibleWidth(truncatedLeft);
-			const padLen = Math.max(0, innerWidth - leftWidth - rightWidth);
+			const padLen = Math.max(0, innerWidth - leftWidth - rightWidth - extraWidth);
 			const pad = " ".repeat(padLen);
 			return `${frame(g.v)} ${truncatedLeft}${pad}${safeRight} ${frame(g.v)}`;
 		};
@@ -284,9 +356,6 @@ export class WorkspaceProfilesExtendedCard implements Component {
 		lines.push(divider);
 		const fixedHeaderLength = lines.length;
 
-		triggerUsageRefresh(this.ctx, this.tui, 15000);
-		const cachedAccounts = getCachedAccounts();
-
 		const bodyLines: string[] = [];
 		const bodyEffortHitboxes: {
 			type: "effort-host" | "effort-agent";
@@ -296,186 +365,13 @@ export class WorkspaceProfilesExtendedCard implements Component {
 			endX: number;
 		}[] = [];
 
-		const detectExpectedProvider = (model: string): "codex" | "antigravity" | "unknown" => {
-			const m = model.toLowerCase();
-			if (m.includes("gpt") || m.includes("codex") || m.includes("o1") || m.includes("o3") || m.includes("o4")) {
-				return "codex";
-			}
-			if (m.includes("gemini") || m.includes("argon") || m.includes("claude") || m.includes("antigravity")) {
-				return "antigravity";
-			}
-			return "unknown";
-		};
-
-		interface FormattedDynamicPool {
-			label: string;
-			pct: number;
-			threshold: any;
-			resetStr: string;
-		}
-
-		const getAccountModelPools = (
-			account: string,
-			model: string,
-		): {
-			hasAccount: boolean;
-			resolvedPrefix: string;
-			pools: FormattedDynamicPool[];
-		} => {
-			if (!cachedAccounts || cachedAccounts.length === 0) {
-				return { hasAccount: false, resolvedPrefix: account, pools: [] };
-			}
-
-			const accLower = account.toLowerCase().trim();
-			const expectedProv = detectExpectedProvider(model);
-
-			// Match Strategy:
-			// 1. Exact prefix match with matching expected provider
-			let matching = cachedAccounts.find(
-				(a) => a.prefix.toLowerCase() === accLower && (expectedProv === "unknown" || a.provider === expectedProv),
-			);
-
-			// 2. Exact prefix match across any provider
-			if (!matching) {
-				matching = cachedAccounts.find((a) => a.prefix.toLowerCase() === accLower);
-			}
-
-			// 3. Provider-scoped partial match (e.g. "cilon" matches "cilon-gpt" when model is gpt/codex)
-			if (!matching && expectedProv !== "unknown") {
-				matching = cachedAccounts.find(
-					(a) =>
-						a.provider === expectedProv &&
-						(a.prefix.toLowerCase().includes(accLower) || accLower.includes(a.prefix.toLowerCase())),
-				);
-			}
-
-			// 4. Fallback: first account of expected provider if account is generic like "host" or "default"
-			if (!matching && expectedProv !== "unknown" && (accLower === "host" || accLower === "default" || !accLower)) {
-				matching = cachedAccounts.find((a) => a.provider === expectedProv);
-			}
-
-			// 5. General partial match
-			if (!matching) {
-				matching = cachedAccounts.find(
-					(a) =>
-						a.prefix.toLowerCase().includes(accLower) ||
-						accLower.includes(a.prefix.toLowerCase()),
-				);
-			}
-
-			if (!matching || !matching.pools || matching.pools.length === 0) {
-				return { hasAccount: false, resolvedPrefix: account, pools: [] };
-			}
-
-			const resolvedPrefix = matching.prefix || account;
-			const modelLower = model.toLowerCase();
-			let candidatePools: QuotaPoolDisplay[] = matching.pools;
-
-			// Filter pools by model family tokens if the account has distinct pools for different families
-			const modelTokens = modelLower
-				.split(/[\/_.:\s-]+/)
-				.filter((t) => t.length >= 3 && !/^(cpam|cpamc|default|model|high|low|medium|pro|flash|mini|preview|latest)$/.test(t));
-
-			const matchingModelPools = matching.pools.filter((p: QuotaPoolDisplay) => {
-				const labelLower = p.label.toLowerCase();
-				return modelTokens.some((tok) => labelLower.includes(tok));
-			});
-
-			if (matchingModelPools.length > 0) {
-				candidatePools = matchingModelPools;
-			}
-
-			// Format all candidate pools dynamically
-			const formattedPools: FormattedDynamicPool[] = candidatePools.map((p) => {
-				const pct = Math.round(p.availablePercent);
-				const threshold = getQuotaThreshold(p.availablePercent, c);
-				const resetStr = formatRelativeReset(p.resetAt);
-				const label = cleanDynamicPoolLabel(p.label);
-				return { label, pct, threshold, resetStr };
-			});
-
-			return {
-				hasAccount: true,
-				resolvedPrefix,
-				pools: formattedPools,
-			};
-		};
-
-		const cellWidth = Math.max(1, calcVisibleWidth(g.gaugeFilled) || 1);
-		const barCells = Math.max(4, Math.floor(innerWidth / cellWidth));
-
-		const renderFullGaugeBar = (quota?: { pct: number; threshold: any }): string => {
-			if (!quota) {
-				return c.dim(g.gaugeEmpty.repeat(barCells));
-			}
-			const filled = Math.min(barCells, Math.max(0, Math.round((quota.pct / 100) * barCells)));
-			const empty = Math.max(0, barCells - filled);
-			return `${quota.threshold.color(g.gaugeFilled.repeat(filled))}${c.dim(g.gaugeEmpty.repeat(empty))}`;
-		};
-
-		const renderModelQuotaBars = (
-			account: string,
-			quotaInfo: ReturnType<typeof getAccountModelPools>,
-		): void => {
-			if (!quotaInfo.hasAccount || quotaInfo.pools.length === 0) {
-				bodyLines.push(boxLine(c.mint(`@${account}`), c.dim("sin cuota")));
-				bodyLines.push(boxLine(renderFullGaugeBar(undefined)));
-				return;
-			}
-
-			const displayPrefix = quotaInfo.resolvedPrefix || account;
-
-			// Render each pool dynamically (1 pool for Gemini/Argon, 2 pools for Codex/Claude, etc.)
-			quotaInfo.pools.forEach((pool, idx) => {
-				const isFirst = idx === 0;
-				const left = isFirst
-					? `${c.mint(`@${displayPrefix}`)} ${c.dim("·")} ${c.muted(pool.label)}`
-					: `${c.muted(pool.label)}`;
-				const pctText = c.bold(pool.threshold.color(`${pool.pct}%`));
-				const right = pool.resetStr ? `${pctText} ${c.dim(`(${pool.resetStr})`)}` : pctText;
-				bodyLines.push(boxLine(left, right));
-				bodyLines.push(boxLine(renderFullGaugeBar(pool)));
-			});
-		};
-
 		// 2. Host row
 		const hostModel = activeDetails.default_model || "default";
-		const hostEffort = activeDetails.default_effort || "high";
-		const hostAccount = (activeDetails as any).default_account || extractAccountFromModel(hostModel) || "host";
 		const shortHost = shortModelName(hostModel).replace(/-high$/, "");
 
-		// Line 1: Host title + model
 		const hostLeft = `${c.violet("🎯")} ${c.bold(c.violet("host / orquestador"))}`;
-		const hostMeta = `${c.gold(shortHost)} ${c.dim(`(${hostEffort})`)}`;
-		const hostBodyLineIndex = bodyLines.length;
-		if (calcVisibleWidth("🎯 host / orquestador") + calcVisibleWidth(`${shortHost} (${hostEffort})`) + 2 <= innerWidth) {
-			bodyLines.push(boxLine(hostLeft, hostMeta));
-			// Effort hitbox on the right side
-			const effortWidth = calcVisibleWidth(`(${hostEffort})`);
-			const safeRightX = innerWidth + 2 - effortWidth;
-			bodyEffortHitboxes.push({
-				type: "effort-host",
-				bodyLineIndex: hostBodyLineIndex,
-				startX: Math.max(2, safeRightX),
-				endX: innerWidth + 2,
-			});
-		} else {
-			bodyLines.push(boxLine(hostLeft));
-			const subBodyLineIndex = bodyLines.length;
-			bodyLines.push(boxLine(`  ${hostMeta}`));
-			const effortWidth = calcVisibleWidth(`(${hostEffort})`);
-			const safeRightX = innerWidth + 2 - effortWidth;
-			bodyEffortHitboxes.push({
-				type: "effort-host",
-				bodyLineIndex: subBodyLineIndex,
-				startX: Math.max(2, safeRightX),
-				endX: innerWidth + 2,
-			});
-		}
-
-		// Quota bars (5h y Semanal)
-		const hostQuota = getAccountModelPools(hostAccount, hostModel);
-		renderModelQuotaBars(hostAccount, hostQuota);
+		const hostRight = c.gold(shortHost);
+		bodyLines.push(boxLine(hostLeft, hostRight));
 
 		// 3. Dynamic agent rows discovered from active profile
 		const allAgentIds = Object.keys(activeDetails.model_profiles || {});
@@ -502,53 +398,48 @@ export class WorkspaceProfilesExtendedCard implements Component {
 		};
 
 		if (allAgentIds.length === 0) {
-			bodyLines.push(boxLine(""));
 			bodyLines.push(boxLine(c.dim("sin subagentes configurados")));
 		} else {
 			for (const agentId of allAgentIds) {
-				bodyLines.push(boxLine(""));
-
 				const agentCfg = activeDetails.model_profiles?.[agentId];
 				const model = agentCfg?.model || hostModel;
-				const effort = agentCfg?.effort || hostEffort;
-				const account = (agentCfg as any)?.account || extractAccountFromModel(agentCfg?.model) || hostAccount;
 				const shortAgent = shortModelName(model).replace(/-high$/, "");
-
-				const agentQuota = getAccountModelPools(account, model);
 				const style = getAgentStyle(agentId);
 
-				// Line 1: If name + model fits in one line, keep it together; otherwise put model on its own subline
 				const leftText = `${style.bullet} ${style.name(agentId)}`;
-				const rightText = `${c.gold(shortAgent)} ${c.dim(`(${effort})`)}`;
-				const agentBodyLineIndex = bodyLines.length;
-				if (calcVisibleWidth(`• ${agentId}`) + calcVisibleWidth(`${shortAgent} (${effort})`) + 2 <= innerWidth) {
-					bodyLines.push(boxLine(leftText, rightText));
-					const effortWidth = calcVisibleWidth(`(${effort})`);
-					const safeRightX = innerWidth + 2 - effortWidth;
-					bodyEffortHitboxes.push({
-						type: "effort-agent",
-						agentId,
-						bodyLineIndex: agentBodyLineIndex,
-						startX: Math.max(2, safeRightX),
-						endX: innerWidth + 2,
-					});
-				} else {
-					bodyLines.push(boxLine(leftText));
-					const subBodyLineIndex = bodyLines.length;
-					bodyLines.push(boxLine(`  ${rightText}`));
-					const effortWidth = calcVisibleWidth(`(${effort})`);
-					const safeRightX = innerWidth + 2 - effortWidth;
-					bodyEffortHitboxes.push({
-						type: "effort-agent",
-						agentId,
-						bodyLineIndex: subBodyLineIndex,
-						startX: Math.max(2, safeRightX),
-						endX: innerWidth + 2,
-					});
-				}
+				const rightText = c.gold(shortAgent);
+				bodyLines.push(boxLine(leftText, rightText));
+			}
+		}
 
-				// Quota bars (5h y Semanal)
-				renderModelQuotaBars(account, agentQuota);
+		// 3b. Delegated subagent tasks
+		const delegated = this.collectDelegatedTasks();
+		if (delegated.length > 0) {
+			bodyLines.push(divider);
+			const running = delegated.filter((t) => t.status === "running").length;
+			const completed = delegated.filter((t) => t.status === "completed").length;
+			const summaryRight =
+				running > 0
+					? `${c.mint(`${running} act`)} · ${c.dim(`${completed} ok`)}`
+					: c.dim(`${delegated.length} total`);
+			// ⚡ renders 2 cells wide in terminals but calcVisibleWidth counts 1
+			bodyLines.push(boxLine(`${c.accent("⚡ Subagentes Delegados")}`, summaryRight, 1));
+			for (const t of delegated) {
+				const style = getAgentStyle(t.agent);
+				const durationMs = (t.finishedAt ?? Date.now()) - t.startedAt;
+				bodyLines.push(
+					boxLine(
+						`${style.bullet} ${style.name(`[${t.agent}]`)} ${c.text(t.label)}`,
+						formatSubagentStatusTag(t.status, c),
+					),
+				);
+				bodyLines.push(
+					boxLine(
+						`   ${c.dim("ID:")} ${c.muted(t.id)} ${c.dim("·")} ${c.dim(t.mode === "background" ? "bg" : "task")} ${c.dim("·")} ${c.muted(formatTaskDuration(durationMs))}`,
+					),
+				);
+				if (t.error) bodyLines.push(boxLine(`   ${c.coral(`↳ ${t.error}`)}`));
+				else if (t.resultSummary) bodyLines.push(boxLine(`   ${c.dim(`↳ ${t.resultSummary}`)}`));
 			}
 		}
 
