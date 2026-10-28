@@ -13,9 +13,9 @@ export interface SolviSidebarTab {
 
 export const SIDEBAR_TAB_CARD_MAP: Record<string, string[]> = {
 	skills: ["main-list", "main-viewer"],
-	git: ["gitGraph", "workingTree", "todo"],
+	git: ["gitGraph", "workingTree"],
 	prof: ["solvi-profiles"],
-	mem: ["ecosystem", "models"],
+	mem: ["ecosystem", "models", "engram", "tools", "todo"],
 	tree: ["projectTree", "fileViewer"],
 	solvi: ["solviTab"],
 };

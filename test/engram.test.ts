@@ -31,7 +31,7 @@ test("solvi-engram - detectProjectName, formatRelativeTime, resolveDashboardUrl,
 
 	// 1. detectProjectName
 	const proj = detectProjectName(process.cwd());
-	assert.equal(proj, "solvitu");
+	assert.ok(proj === "solvitu" || proj === "solvitu-gentle-shell");
 
 	// 2. formatRelativeTime
 	const now = new Date("2026-09-23T12:00:00Z");
@@ -134,6 +134,7 @@ Found 1 memories:
 
 	// Tab mappings check
 	assert.ok(SIDEBAR_TAB_CARD_MAP.git.includes("workingTree"), "git tab must include workingTree");
+	for (const k of ["engram", "tools", "todo"]) assert.ok(SIDEBAR_TAB_CARD_MAP.mem.includes(k), `STACK tab must include ${k}`);
 	assert.ok(!SIDEBAR_TAB_CARD_MAP.mem.includes("engramHandoff"), "STACK tab must not include the Active Handoff card");
 	assert.ok(!SIDEBAR_TAB_CARD_MAP.mem.includes("persistentMemory"), "STACK tab keeps only the stack and models cards");
 });

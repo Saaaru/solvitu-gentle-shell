@@ -200,6 +200,21 @@ test("models - WorkspaceModelsCard renders exact-width lines", () => {
 	}
 });
 
+test("models - WorkspaceModelsCard renders one name + provider line per model", () => {
+	const entries = [assistant("anthropic", "claude-opus-4", 1000, 500, 0.42)];
+	const ctx = mockCtx({ scoped: [MODELS[0], MODELS[2]], entries, active: MODELS[0] });
+	const card = new WorkspaceModelsCard(ctx, { requestRender() {} } as any);
+	const lines = card.render(50);
+	assert.equal(lines.length, 4, "top + 2 models + bottom");
+	const text = lines.join("\n");
+	assert.ok(/● .*Claude Opus 4 · anthropic/.test(text) || /● .*claude-opus-4 · anthropic/.test(text), text);
+	assert.ok(/○ .*GPT-5 · openai/.test(text) || /○ .*gpt-5 · openai/.test(text), text);
+	for (const banned of ["ctx", "in /", "out", "$", "█", "░", "cuota"]) {
+		assert.ok(!text.includes(banned), `must not include ${banned}`);
+	}
+	for (const line of lines) assert.equal(calcVisibleWidth(line), 50);
+});
+
 test("models - WorkspaceModelsCard empty state", () => {
 	const ctx: any = {
 		cwd: tmpdir(),
